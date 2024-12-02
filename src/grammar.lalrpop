@@ -1,0 +1,145 @@
+use crate::tokens::{Token, LexicalError};
+use super::utils;
+use lalrpop_util::ParseError;
+
+grammar;
+
+extern {
+  type Location = usize;
+  type Error = LexicalError;
+
+  enum Token {
+    "var" => Token::KeywordVar,
+    "print" => Token::KeywordPrint,
+    "block" => Token::KeywordBlock,
+    "identifier" => Token::Identifier(<String>),
+    "int" => Token::Integer(<i32>),
+    "null" => Token::NullValue,
+    "(" => Token::LParen,
+    ")" => Token::RParen,
+    ";" => Token::Semicolon,
+    ":=" => Token::Assign,
+    "{" => Token::LBrace,
+    "}" => Token::RBrace,
+    "[" => Token::LBracket,
+    "]" => Token::RBracket,
+    "+" => Token::OperatorAdd,
+    "-" => Token::OperatorSub,
+    "*" => Token::OperatorMul,
+    "/" => Token::CmpToken,
+    "add1" => Token::OperatorAdd1,
+    "sub1" => Token::OperatorSub1,
+    "let" => Token::KeywordLet,
+    "set" => Token::KeywordSet,
+    "repeat-until" => Token::KeywordRepeatUntil,
+    "if" => Token::KeywordIf,
+    "bool" => Token::Boolean(<bool>),
+    ">" => Token::OperatorGreater,
+    "<" => Token::OperatorLess,
+    ">=" => Token::OperatorGreaterEqual,
+    "<=" => Token::OperatorLessEqual,
+    "=" => Token::OperatorEqual,
+    "fun" => Token::OperatorFun,
+    "i64" => Token::KeywordInt,
+    "boolean" => Token::KeywordBool,
+  }
+}
+
+
+pub TypeMatching: utils::Type = {
+  "i64" => utils::Type::Int,
+  "boolean" => utils::Type::Bool,
+}
+
+pub ExpressionBody: utils::Expr = {
+  "let" "{" <bindings:VarBinding*> "}" "{" <expr:Expression> "}" =>? {
+      if bindings.len() == 0 {Err(ParseError::User { 
+          error: LexicalError::InvalidLength("empty binding in let".to_string())
+        })}
+      else {Ok(utils::Expr::Let (bindings, Box::new(expr)))}
+    },
+  "block" "{" <exprs:Expression*> "}" =>? {
+    if exprs.len() == 0 {Err(ParseError::User { 
+        error: LexicalError::InvalidLength("empty block".to_string())
+      })}
+    else {Ok(utils::Expr::Block (exprs))}
+  },
+  "set" <name:"identifier"> ":=" <value:Expression> ";" =>? {
+    if name == "input" {Err(ParseError::User { 
+        error: LexicalError::InvalidSet
+      })}
+    else {Ok(utils::Expr::Set (name, Box::new(value)))}
+  },
+  "if" "{" <if_value:Expression> "}" "{" <then_value:Expression> "}"  "{" <else_value:Expression> "}" => {
+    utils::Expr::If (Box::new(if_value), Box::new(then_value), Box::new(else_value))
+  },
+  "repeat-until" "{" <expression:Expression> "}" "{" <condition:Expression> "}"  => {
+    utils::Expr::RepeatUntil ( Box::new(expression), Box::new(condition) )
+  },
+  "print" <expression:Expression> ";" => {
+    utils::Expr::UnOp (utils::Op1::Print, Box::new(expression))
+  },
+}
+
+pub VarBinding : (String, utils::Expr) = {
+  "var" <name:"identifier"> ":=" <value:Expression> ";" => {
+    (name, value)
+  }
+}
+
+pub CmpExpression: utils::Expr = {
+  Term,
+  <lhs:Expression> <op:CmpOp> <rhs:Term> => utils::Expr::BinOp (op, Box::new(lhs), Box::new(rhs))
+    
+}
+
+pub Expression: utils::Expr = {
+  CmpExpression,
+  ExpressionBody,
+}
+
+pub Term: utils::Expr = {
+  Addend,
+  <lhs:Term> <op:AddOp> <rhs:Addend> => utils::Expr::BinOp (op, Box::new(lhs), Box::new(rhs))
+}
+
+pub Addend: utils::Expr = {
+  Factor,
+  <lhs:Addend> "*" <rhs:Factor> => utils::Expr::BinOp(utils::Op2::Times, Box::new(lhs), Box::new(rhs))
+}
+
+pub Factor: utils::Expr = {
+  Summand,
+  "(" <op:UnOp> <rhs:Summand> ")" => utils::Expr::UnOp (op, Box::new(rhs))
+}
+
+pub Summand: utils::Expr = {
+  <val:"int"> => {
+    utils::Expr::Number(val)
+  },
+  <name:"identifier"> => {
+    utils::Expr::Id(name)
+  },
+  <val:"bool"> => {
+    utils::Expr::Boolean(val)
+  },
+  "(" <e:Expression> ")" => e
+}
+
+pub CmpOp: utils::Op2 = {
+  "<" => utils::Op2::Less,
+  ">" => utils::Op2::Greater,
+  "<=" => utils::Op2::LessEqual,
+  ">=" => utils::Op2::GreaterEqual,
+  "=" => utils::Op2::Equal,
+} 
+
+pub AddOp: utils::Op2 = {
+  "+" => utils::Op2::Plus,
+  "-" => utils::Op2::Minus,
+}
+
+pub UnOp: utils::Op1 = {
+  "add1" => utils::Op1::Add1,
+  "sub1" => utils::Op1::Sub1,
+}

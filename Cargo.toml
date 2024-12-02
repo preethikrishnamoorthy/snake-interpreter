@@ -1,0 +1,25 @@
+[package]
+name = "snake-interpreter"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.65"
+
+[dependencies]
+piston_window = "0.123.0"
+rand = "0.8"
+lalrpop-util = { version = "0.21.0", features = ["lexer", "unicode"] }
+logos = "0.14.0"
+im = "15.1.0"
+sexp = "1.1.4"
+dynasmrt = "2.0.0"
+
+[build-dependencies]
+lalrpop = "0.22.0"
+
+[dev-dependencies]
+prettydiff = "0.6.4"
+
+[features]
+default = []
+bit = []
+
