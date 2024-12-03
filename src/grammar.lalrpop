@@ -58,26 +58,11 @@ pub ExpressionBody: utils::Expr = {
         })}
       else {Ok(utils::Expr::Let (bindings, Box::new(expr)))}
     },
-  "block" "{" <exprs:Expression*> "}" =>? {
-    if exprs.len() == 0 {Err(ParseError::User { 
-        error: LexicalError::InvalidLength("empty block".to_string())
-      })}
-    else {Ok(utils::Expr::Block (exprs))}
-  },
   "set" <name:"identifier"> ":=" <value:Expression> ";" =>? {
     if name == "input" {Err(ParseError::User { 
         error: LexicalError::InvalidSet
       })}
     else {Ok(utils::Expr::Set (name, Box::new(value)))}
-  },
-  "if" "{" <if_value:Expression> "}" "{" <then_value:Expression> "}"  "{" <else_value:Expression> "}" => {
-    utils::Expr::If (Box::new(if_value), Box::new(then_value), Box::new(else_value))
-  },
-  "repeat-until" "{" <expression:Expression> "}" "{" <condition:Expression> "}"  => {
-    utils::Expr::RepeatUntil ( Box::new(expression), Box::new(condition) )
-  },
-  "print" <expression:Expression> ";" => {
-    utils::Expr::UnOp (utils::Op1::Print, Box::new(expression))
   },
 }
 
@@ -87,14 +72,9 @@ pub VarBinding : (String, utils::Expr) = {
   }
 }
 
-pub CmpExpression: utils::Expr = {
-  Term,
-  <lhs:Expression> <op:CmpOp> <rhs:Term> => utils::Expr::BinOp (op, Box::new(lhs), Box::new(rhs))
-    
-}
 
 pub Expression: utils::Expr = {
-  CmpExpression,
+  Term,
   ExpressionBody,
 }
 
@@ -120,19 +100,8 @@ pub Summand: utils::Expr = {
   <name:"identifier"> => {
     utils::Expr::Id(name)
   },
-  <val:"bool"> => {
-    utils::Expr::Boolean(val)
-  },
   "(" <e:Expression> ")" => e
 }
-
-pub CmpOp: utils::Op2 = {
-  "<" => utils::Op2::Less,
-  ">" => utils::Op2::Greater,
-  "<=" => utils::Op2::LessEqual,
-  ">=" => utils::Op2::GreaterEqual,
-  "=" => utils::Op2::Equal,
-} 
 
 pub AddOp: utils::Op2 = {
   "+" => utils::Op2::Plus,
