@@ -38,20 +38,9 @@ pub enum Instr {
     IAdd(Val, Val),
     ISub(Val, Val),
     IMul(Val, Val),
-    ICmp(Val, Val),
-    Je(String, i32),
-    Cmove(Val, Val),
-    Cmovl(Val, Val),
-    Cmovle(Val, Val),
     Label(String, i32),
-    Jmp(String, i32),
     Jno(String, i32),
-    CallFn(String),
     CallSnekErr(),
-    CallSnekPrint(),
-    DefMainFn(),
-    DefFn(String),
-    Ret(),
     Pop(Val),
     Push(Val),
 }
@@ -61,7 +50,6 @@ pub enum Instr {
 pub enum Op1 {
     Add1,
     Sub1,
-    Print
 }
 
 #[derive(Debug)]
@@ -71,11 +59,6 @@ pub enum Op2 {
     Plus,
     Minus,
     Times,
-    Equal, 
-    Greater, 
-    GreaterEqual, 
-    Less, 
-    LessEqual,
 }
 
 #[derive(Debug)]
@@ -86,11 +69,7 @@ pub enum Expr {
     Let(Vec<(String, Expr)>, Box<Expr>),
     UnOp(Op1, Box<Expr>),
     BinOp(Op2, Box<Expr>, Box<Expr>),
-    If(Box<Expr>, Box<Expr>, Box<Expr>),
-    RepeatUntil(Box<Expr>, Box<Expr>),
     Set(String, Box<Expr>),
-    Block(Vec<Expr>),
-    Boolean(bool),
 }
 
 #[derive(PartialEq)]
@@ -104,27 +83,14 @@ pub enum Type {
 pub fn typecheck(e: &Expr, mut ctx: &mut HashMap<String, Type>) -> Type {
     match e {
         Expr::Number(_) => Type::Int,
-        Expr::Boolean(_) => Type::Bool,
-        Expr::BinOp(op_name, e1, e2) => {
+        Expr::BinOp(_, e1, e2) => {
             let ty1 = typecheck(e1, &mut ctx);
             let ty2 = typecheck(e2, &mut ctx);
             if ty1 != ty2 {
                 panic!("Invalid: type mismatch binop");             
             }
+            return Type::Int;
             
-            if ty1 == Type::Bool && *op_name != Op2::Equal {
-                panic!("Invalid: type mismatch bool")
-            }
-            match op_name {
-                Op2::Equal => Type::Bool,
-                Op2::Greater => Type::Bool,
-                Op2::GreaterEqual => Type::Bool,
-                Op2::Less => Type::Bool,
-                Op2::LessEqual => Type::Bool,
-                Op2::Minus => Type::Int,
-                Op2::Plus => Type::Int,
-                Op2::Times => Type::Int,
-            }
         },
         Expr::Id(name) => {   
             match ctx.get(&name.to_string()) {
@@ -145,7 +111,6 @@ pub fn typecheck(e: &Expr, mut ctx: &mut HashMap<String, Type>) -> Type {
         Expr::UnOp(op1, expr) => {
             let ty1 = typecheck(expr, &mut ctx);
             match op1 {
-                Op1::Print => ty1,
                 _ => {
                     if ty1 != Type::Int {
                         panic!("Invalid: type mismatch: UnOp expects int");
@@ -154,39 +119,11 @@ pub fn typecheck(e: &Expr, mut ctx: &mut HashMap<String, Type>) -> Type {
                 }
             }
         },
-        Expr::If(condition, condition_true, condition_false) => {
-            let ty_condition = typecheck(&condition, &mut ctx);
-            if ty_condition != Type::Bool {
-                panic!("Invalid: type mismatch: if condition is not bool");
-            }
-            let ty1 = typecheck(&condition_true, &mut ctx);
-            let ty2 = typecheck(&condition_false, &mut ctx);
-            if ty1 != ty2 {
-                panic!("Invalid: type mismatch: if branches are not the same type")
-            }
-            ty1
-        },
-        Expr::RepeatUntil(body, condition) => {
-            let ty1 = typecheck(condition, &mut ctx);
-            let ty2 = typecheck(body, &mut ctx);
-            if ty1 != Type::Bool {
-                panic!("Invalid: type mismatch: repeatUntil condition not bool")
-            }
-            ty2
-        },
         Expr::Set(var_name, var_value) => {
             if KEYWORD_LIST.contains(var_name) {
                 panic!("Invalid: variable name is a keyword");
             }
             typecheck(var_value, &mut ctx)
-        },
-        Expr::Block(vec) => {
-            let mut last_type = Type::Int;
-            for expr in vec {
-                last_type = typecheck(expr, &mut ctx);
-
-            }
-            last_type
         },
     }
 }
@@ -198,21 +135,9 @@ pub fn instr_to_str(i: &Instr) -> String {
         Instr::IAdd(val1, val2) => format!("add {}, {}\n", val_to_str(val1), val_to_str(val2)),
         Instr::ISub(val1, val2) => format!("sub {}, {}\n", val_to_str(val1), val_to_str(val2)),
         Instr::IMul(val1, val2) => format!("imul {}, {}\n", val_to_str(val1), val_to_str(val2)),
-        Instr::ICmp(val1, val2) => format!("cmp {}, {}\n", val_to_str(val1), val_to_str(val2)),
-        Instr::Je(name, num) => format!("je {}{}\n", name.to_string(), num.to_string()),
-        Instr::Jmp(name, num) => format!("jmp {}{}\n", name.to_string(), num.to_string()),
-        Instr::Cmove(val1, val2) => format!("cmove {}, {}\n", val_to_str(val1), val_to_str(val2)),
-        Instr::Cmovl(val1, val2) => format!("cmovl {}, {}\n", val_to_str(val1), val_to_str(val2)),
-        Instr::Cmovle(val1, val2) => format!("cmovle {}, {}\n", val_to_str(val1), val_to_str(val2)),
         Instr::Label(name, num) => format!("{}{}:\n", name.to_string(), num.to_string()),
-        // append -function to the function name to differentiate from end/else labels
-        Instr::DefFn(name) => format!("\n{}_function:\n", name),
-        Instr::DefMainFn() => format!("\n\nour_code_starts_here:\n"),
-        Instr::CallFn(name) => format!("call {}_function\n", name),
         Instr::CallSnekErr() => format!("call snek_error\n"),
-        Instr::CallSnekPrint() => format!("call snek_print\n"),
         Instr::Jno(name, num) => format!("jno {}{}\n", name.to_string(), num.to_string()),
-        Instr::Ret() => format!("ret\n"),
         Instr::Pop(val1) => format!("pop {}\n", val_to_str(val1)),
         Instr::Push(val1) => format!("push {}\n", val_to_str(val1)),
     }

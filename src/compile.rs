@@ -24,26 +24,11 @@ fn bool_to_num(b: &bool) -> i32 {
     }
 }
 
-fn common_print_instr(stack_counter: i32) -> Vec<Instr> {
-    let mut v = vec![];
-    v.push(Instr::IMov(Val::Reg(Reg::R12), Val::Reg(Reg::RAX)));
-    if (stack_counter / 8) % 2 == 1 {
-        v.push(Instr::ISub(Val::Reg(Reg::RSP), Val::Imm(8)))
-    }
-    v.push(Instr::CallSnekPrint());
-    if (stack_counter / 8) % 2 == 1 {
-        v.push(Instr::IAdd(Val::Reg(Reg::RSP), Val::Imm(8)))
-    }
-    v.push(Instr::IMov(Val::Reg(Reg::RAX), Val::Reg(Reg::R12)));
-    return v;
-}
-
 pub fn compile_to_instrs(e: &Expr, stack_bindings: im::HashMap<String, i32>, 
     mut variable_types: &mut HashMap<String, Type>, stack_counter: i32, 
     defined_vars: &HashMap<String, i32>) -> Vec<Instr> {
     match e {
         Expr::Number(n) => return vec![Instr::IMov(Val::Reg(Reg::RAX), Val::Imm(*n))],
-        Expr::Boolean(b) => return vec![Instr::IMov(Val::Reg(Reg::RAX), Val::Imm(bool_to_num(b)))],
         Expr::Id(x) => {
             match stack_bindings.get(x) {
                 None => {
@@ -58,7 +43,6 @@ pub fn compile_to_instrs(e: &Expr, stack_bindings: im::HashMap<String, i32>,
             }
         },
         Expr::UnOp(op, subexpr) => {
-            let mut mut_ctx = variable_types.clone();
             let mut v = compile_to_instrs(subexpr, stack_bindings.clone(), variable_types,
                 stack_counter, defined_vars);
             match op {
@@ -82,25 +66,6 @@ pub fn compile_to_instrs(e: &Expr, stack_bindings: im::HashMap<String, i32>,
                     *current_jump += 1;
                     drop(current_jump);
                 }
-                Op1::Print => {
-                    //put type of thing to print in RSI
-                    let type_expr = typecheck(subexpr, &mut mut_ctx);
-                    
-                    match type_expr {
-                        Type::Int => {
-                            //put input to print in RDI
-                            v.push(Instr::IMov(Val::Reg(Reg::RDI), Val::Reg(Reg::RAX)));
-                            v.push(Instr::IMov(Val::Reg(Reg::RSI), Val::Imm(0)));
-                            v.append(&mut common_print_instr(stack_counter));
-                        },
-                        Type::Bool => {
-                            //put input to print in RDI
-                            v.push(Instr::IMov(Val::Reg(Reg::RDI), Val::Reg(Reg::RAX)));
-                            v.push(Instr::IMov(Val::Reg(Reg::RSI), Val::Imm(1)));
-                            v.append(&mut common_print_instr(stack_counter));
-                        },
-                    }
-                }
             }
             return v;
         },
@@ -123,38 +88,6 @@ pub fn compile_to_instrs(e: &Expr, stack_bindings: im::HashMap<String, i32>,
                 Op2::Times => v1.push(Instr::IMul(Val::Reg(Reg::RAX), Val::Reg(Reg::RCX))),
                 // need to add more instructions for the following comparison operations
                 // cmp e1, e2 does e1 - e2
-                Op2::Equal => {
-                    v1.push(Instr::ICmp(Val::Reg(Reg::RAX), Val::Reg(Reg::RCX)));
-                    v1.push(Instr::IMov(Val::Reg(Reg::RBX), Val::Imm(1)));
-                    v1.push(Instr::IMov(Val::Reg(Reg::RAX), Val::Imm(0)));
-                    v1.push(Instr::Cmove(Val::Reg(Reg::RAX), Val::Reg(Reg::RBX)));
-                },
-                Op2::Less => {
-                    v1.push(Instr::ICmp(Val::Reg(Reg::RAX), Val::Reg(Reg::RCX)));
-                    v1.push(Instr::IMov(Val::Reg(Reg::RBX), Val::Imm(1)));
-                    v1.push(Instr::IMov(Val::Reg(Reg::RAX), Val::Imm(0)));
-                    v1.push(Instr::Cmovl(Val::Reg(Reg::RAX), Val::Reg(Reg::RBX)));
-                },
-                Op2::LessEqual => {
-                    v1.push(Instr::ICmp(Val::Reg(Reg::RAX), Val::Reg(Reg::RCX)));
-                    v1.push(Instr::IMov(Val::Reg(Reg::RBX), Val::Imm(1)));
-                    v1.push(Instr::IMov(Val::Reg(Reg::RAX), Val::Imm(0)));
-                    v1.push(Instr::Cmovle(Val::Reg(Reg::RAX), Val::Reg(Reg::RBX)));
-                },
-                // use Cmovle for Greater and switch the true/false stored in RBX/RAX
-                Op2::Greater => {
-                    v1.push(Instr::ICmp(Val::Reg(Reg::RAX), Val::Reg(Reg::RCX)));
-                    v1.push(Instr::IMov(Val::Reg(Reg::RBX), Val::Imm(0)));
-                    v1.push(Instr::IMov(Val::Reg(Reg::RAX), Val::Imm(1)));
-                    v1.push(Instr::Cmovle(Val::Reg(Reg::RAX), Val::Reg(Reg::RBX)));
-                },
-                // use Cmovl for GreaterEqual and switch the true/false stored in RBX/RAX
-                Op2::GreaterEqual => {
-                    v1.push(Instr::ICmp(Val::Reg(Reg::RAX), Val::Reg(Reg::RCX)));
-                    v1.push(Instr::IMov(Val::Reg(Reg::RBX), Val::Imm(0)));
-                    v1.push(Instr::IMov(Val::Reg(Reg::RAX), Val::Imm(1)));
-                    v1.push(Instr::Cmovl(Val::Reg(Reg::RAX), Val::Reg(Reg::RBX)));
-                }
             }
             // let mut current_jump = JUMP_LABEL.lock().unwrap();
             // v1.push(Instr::Jno("binopSuccess".to_string(), *current_jump));
@@ -193,46 +126,6 @@ pub fn compile_to_instrs(e: &Expr, stack_bindings: im::HashMap<String, i32>,
             v.push(Instr::IAdd(Val::Reg(Reg::RSP), Val::Imm(8 * vec.len() as i32)));
             return v;
         },
-        Expr::If(subexpr1, subexpr2, subexpr3) => {
-            let mut v1 = compile_to_instrs(subexpr1, stack_bindings.clone(), &mut variable_types, stack_counter,
-                defined_vars);
-
-            // check if subexpr1 = false
-            let mut current_jump = JUMP_LABEL.lock().unwrap();
-            let current_jump_value = *current_jump;
-            *current_jump += 1;
-            drop(current_jump);
-            v1.push(Instr::IMov(Val::Reg(Reg::RBX), Val::Imm(0)));
-            v1.push(Instr::ICmp(Val::Reg(Reg::RAX), Val::Reg(Reg::RBX)));
-            v1.push(Instr::Je("else".to_string(), current_jump_value));
-            
-
-            // compile true case (subexpression 2)
-            let mut v2 = compile_to_instrs(subexpr2, stack_bindings.clone(), &mut variable_types, stack_counter,
-                defined_vars);
-            v1.append(&mut v2);
-            // jump past false case after executing true case
-            v1.push(Instr::Jmp("end".to_string(), current_jump_value));
-
-            // compile false case (subexpression 3)
-            v1.push(Instr::Label("else".to_string(), current_jump_value));
-            let mut v3 = compile_to_instrs(subexpr3, stack_bindings.clone(), &mut variable_types, stack_counter,
-                defined_vars);
-            v1.append(&mut v3);
-
-            // label the next instruction
-            v1.push(Instr::Label("end".to_string(), current_jump_value));
-            
-            return v1;
-        },
-        Expr::Block(vec) => {
-            let mut v = Vec::new(); 
-            for item in vec {
-                v.append(&mut compile_to_instrs(item, stack_bindings.clone(), &mut variable_types, stack_counter,
-                    defined_vars));
-            }
-            return v;
-        },
         Expr::Set(var_name, e) => {
             let mut e_vec = compile_to_instrs(e, stack_bindings.clone(), &mut variable_types, stack_counter,
                 defined_vars);
@@ -244,33 +137,6 @@ pub fn compile_to_instrs(e: &Expr, stack_bindings: im::HashMap<String, i32>,
                     return e_vec;
                 },
             }
-        },
-        Expr::RepeatUntil(body_expr, condition_expr) => {
-            let mut v = Vec::new();
-            let mut current_jump = JUMP_LABEL.lock().unwrap();
-            let current_jump_value = *current_jump;
-            *current_jump += 1;
-            drop(current_jump);
-            v.push(Instr::Label("repeat".to_string(), current_jump_value));
-            let mut body_vec = compile_to_instrs(&body_expr, stack_bindings.clone(), &mut variable_types, stack_counter,
-                defined_vars);
-            v.append(&mut body_vec);
-
-            // store body result on stack
-            v.push(Instr::Push(Val::Reg(Reg::RAX)));
-            let new_stack_counter = stack_counter + 8;
-
-            let mut condition_vec = compile_to_instrs(&condition_expr, stack_bindings.clone(), &mut variable_types,
-                new_stack_counter, defined_vars);
-            v.append(&mut condition_vec);
-
-            // if condition is false, jump back to body label
-            v.push(Instr::IMov(Val::Reg(Reg::RBX), Val::Imm(0)));
-            v.push(Instr::ICmp(Val::Reg(Reg::RAX), Val::Reg(Reg::RBX)));
-            v.push(Instr::Pop(Val::Reg(Reg::RAX)));
-            v.push(Instr::Je("repeat".to_string(), current_jump_value));
-            
-            return v;
         },
     }
 }
@@ -402,7 +268,6 @@ fn push_to_asm(ops: &mut dynasmrt::x64::Assembler, val: &Val) {
     }
 }
 
-
 fn instr_to_asm(i: &Instr, ops: &mut dynasmrt::x64::Assembler) {
     match i {
         Instr::IMov(dest, src) => mov_to_asm(ops, dest, src),
@@ -411,6 +276,10 @@ fn instr_to_asm(i: &Instr, ops: &mut dynasmrt::x64::Assembler) {
         Instr::IMul(dest, src) => mul_to_asm(ops, dest, src),
         Instr::Pop(val) => pop_to_asm(ops, val),
         Instr::Push(val) => push_to_asm(ops, val),
+        // Instr::Label(label_name, label_num) => {
+        //     let full_label_name = label_name.to_string() + &label_num.to_string();
+        //     dynasm!(ops; .arch x64; label:);
+        // }
         _ => {
             panic!("Instruction not supported");
         }
