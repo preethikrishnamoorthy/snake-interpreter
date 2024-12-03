@@ -58,7 +58,7 @@ impl Game {
             food_list: vec![Food {food_x: 5, food_y: 5, instr: "+".to_string()},
                             Food {food_x: 7, food_y: 3, instr: "-".to_string()},
                             Food {food_x: 2, food_y: 8, instr: "*".to_string()},
-                            Food {food_x: 8, food_y: 5, instr: "end".to_string()},
+                            Food {food_x: 8, food_y: 5, instr: "def".to_string()},
                             Food {food_x: 6, food_y: 6, instr: ";".to_string()},
             ],
             width: width,
@@ -194,8 +194,6 @@ impl Game {
                 self.prog_line.push_str(&" ".to_string());
                 self.prog_line.push_str(&instr_eaten.clone());
                 self.prog_line.push_str(&" ".to_string());
-                self.update_food(instr_eaten.clone());
-                self.snake.restore_last_removed();
             }
 
             self.update_food(instr_eaten.clone());
