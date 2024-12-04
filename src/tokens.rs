@@ -74,6 +74,8 @@ pub enum Token {
     #[token("null")]
     NullValue,
 
+    #[token("$")]
+    ProgramEnd,
     #[token("(")]
     LParen,
     #[token(")")]

@@ -13,7 +13,7 @@ fn main() {
     let (width, height) = (20, 20);
 
     // Prepare window settings
-    let mut window_settings = WindowSettings::new("Rust Snake",
+    let mut window_settings = WindowSettings::new("Snake to Snek",
     [to_gui_coord_u32(width), to_gui_coord_u32(height)]).exit_on_esc(true);
 
     // Fix vsync extension error for linux
@@ -24,30 +24,52 @@ fn main() {
 
     // Create a snake
     let mut game = Game::new(width, height);
+    let mut game_started = false;
+    let mut font = window.load_font("src/Poppins-Bold.ttf").unwrap(); // Load a font
 
     // Event loop
     while let Some(event) = window.next() {
 
-        // Catch the events of the keyboard
-        if let Some(Button::Keyboard(key)) = event.press_args() {
-            game.key_pressed(key);
+        if game_started {
+            // Catch the events of the keyboard
+            if let Some(Button::Keyboard(key)) = event.press_args() {
+                game.key_pressed(key);
+            }
+
+            // Draw all of them
+            window.draw_2d(&event, |c, g, _| {
+                clear(BACK_COLOR, g);
+                game.draw(&c, g, &mut font);
+            });
+
+            // Update the state of the game
+            event.update(|arg| {
+                game.update(arg.dt);
+            });
+
+            // if game.check_line_generated() {
+            //     run_line(game.get_prog());
+            // }
+        } else {
+            if let Some(Button::Keyboard(Key::S)) = event.press_args() {
+                game_started = true; // Start the game when "S" is pressed
+            }
+            window.draw_2d(&event, |c, g, _device| {
+                clear([0.5, 0.5, 0.5, 1.0], g); // Gray background for the start screen
+
+                let transform = c.transform.trans(200.0, 240.0); // Position for the text
+                text::Text::new_color([0.0, 0.0, 0.0, 1.0], 32)
+                    .draw(
+                        "Press 'S' to Start",
+                        &mut font,
+                        &DrawState::default(),
+                        transform,
+                        g,
+                    )
+                    .unwrap();
+            });
         }
+
         
-        let mut font = window.load_font("src/Poppins-Bold.ttf").unwrap(); // Load a font
-
-        // Draw all of them
-        window.draw_2d(&event, |c, g, _| {
-            clear(BACK_COLOR, g);
-            game.draw(&c, g, &mut font);
-        });
-
-        // Update the state of the game
-        event.update(|arg| {
-            game.update(arg.dt);
-        });
-
-        // if game.check_line_generated() {
-        //     run_line(game.get_prog());
-        // }
     }
 }

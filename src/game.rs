@@ -117,18 +117,24 @@ impl Game {
         //
         // All values are between 0.0 and 1.0.
         // For example, black is `[0.0, 0.0, 0.0, 1.0]` and white is `[1.0, 1.0, 1.0, 1.0]`.
-        if instr == "+" {
-            return [0.0, 1.0, 1.0, 1.0]; //yellow
-        } else if instr == "-" {
-            return [1.0, 1.0, 0.0, 1.0]; //purple
-        } else if instr == "*" {
-            return [0.0, 0.0, 1.0, 1.0]; //blue
-        } else if instr == ";" {
-            return [0.0, 1.0, 0.0, 1.0]; //green
-        } else if instr == "def" {
-            return [1.0, 0.0, 0.0, 1.0]; //red
-        } else {
-            return FOOD_COLOR;
+        match instr.as_str() {
+            "+" => return [0.0, 1.0, 1.0, 1.0], // yellow
+            "-" => return [1.0, 0.5, 0.0, 1.0], // orange
+            "*" => return [1.0, 0.0, 0.0, 1.0], // red
+            ";" => return [0.0, 1.0, 0.0, 1.0], // yellow green
+            "def" => return [0.0, 1.0, 0.5, 1.0], // bluer green
+            "add1" => return [0.0, 1.0, 1.0, 1.0], // cyan
+            "sub1" => return [0.0, 0.5, 1.0, 1.0], // blue
+            "let" => return [0.0, 0.0, 1.0, 1.0], // dark blue
+            "set" => return [0.5, 0.0, 1.0, 1.0], // purplish blue
+            "(" => return [1.0, 0.0, 1.0, 1.0], // pink
+            ")" => return [0.5, 0.0, 0.5, 1.0], // purple
+            "{" => return [0.5, 0.0, 0.0, 1.0], // maroon
+            "}" => return [0.0, 0.5, 0.0, 1.0], // dark green
+            "var" => return [0.0, 0.0, 0.5, 1.0], // navy blue
+            ":=" => return [0.0, 0.5, 0.5, 1.0], // dark teal
+            // identifier case
+            _ => return FOOD_COLOR, // orange?
         }
         
     }    
@@ -236,12 +242,69 @@ impl Game {
         }        
     }
 
-    fn generate_instructions(&mut self, _last_instr: String) -> Vec<String>{
+    fn generate_instructions(&mut self, last_instr: String) -> Vec<String>{
         println!("is_def_line: {}", self.is_def_line);
         if self.is_def_line {
             return vec!["+".to_string(), "-".to_string(), "*".to_string(), ";".to_string()];
         } else {
-            return vec!["+".to_string(), "-".to_string(), "*".to_string(), "def".to_string(), ";".to_string()];
+            if last_instr.parse::<f64>().is_ok() { // instr is int
+                return vec!["+".to_string(), "-".to_string(), "*".to_string(), ")".to_string(), ";".to_string()]
+            }
+            let mut var_names = vec![];
+            for (name, _) in self.def_bindings.clone().into_iter() {
+                var_names.push(name);
+            }
+            let mut next_instrs = vec!["def".to_string()];
+            match last_instr.as_str() {
+                "(" => next_instrs.append(&mut vec!["(".to_string(), "let".to_string(), "set".to_string(), "add1".to_string(), "sub1".to_string()]),
+                ":=" => {
+                    next_instrs.append(&mut vec!["(".to_string(), "let".to_string(), "set".to_string()]);
+                    next_instrs.append(&mut var_names);
+                },
+                ")" => next_instrs.append(&mut vec!["+".to_string(), "-".to_string(), "*".to_string(), ")".to_string(), ";".to_string(), "}".to_string()]),
+                ";" => {
+                    next_instrs.append(&mut vec!["var".to_string(), "let".to_string(), "set".to_string(), "}".to_string(), "(".to_string()]);
+                    next_instrs.append(&mut var_names);
+                },
+                "var" => next_instrs.append(&mut var_names), 
+                "let" => {
+                    next_instrs.push("{".to_string());
+                    next_instrs.append(&mut var_names);
+                },
+                "set" => next_instrs.append(&mut var_names),
+                "{" => {
+                    next_instrs.append(&mut vec!["let".to_string(), "set".to_string(), "(".to_string(), "var".to_string()]);
+                    next_instrs.append(&mut var_names);
+                },
+                "}" => {
+                    next_instrs.append(&mut vec!["let".to_string(), "set".to_string(), "(".to_string(), "{".to_string(), "}".to_string()]);
+                    next_instrs.append(&mut var_names);
+                }, 
+                "+" => {
+                    next_instrs.append(&mut vec!["(".to_string(), "add1".to_string(), "sub1".to_string()]);
+                    next_instrs.append(&mut var_names);
+                },
+                "-" => {
+                    next_instrs.append(&mut vec!["(".to_string(), "add1".to_string(), "sub1".to_string()]);
+                    next_instrs.append(&mut var_names);
+                }, 
+                "*" => {
+                    next_instrs.append(&mut vec!["(".to_string(), "add1".to_string(), "sub1".to_string()]);
+                    next_instrs.append(&mut var_names);
+                },
+                "add1" => {
+                    next_instrs.push("(".to_string());
+                    next_instrs.append(&mut var_names);
+                }, 
+                "sub1" => {
+                    next_instrs.push("(".to_string());
+                    next_instrs.append(&mut var_names);
+                }, 
+                // identifier case
+                _ => next_instrs.append(&mut vec!["+".to_string(), "-".to_string(), "*".to_string(), ":=".to_string(), ")".to_string(), ";".to_string(), "}".to_string()]),
+            }
+            return next_instrs;
+            // return vec!["+".to_string(), "-".to_string(), "*".to_string(), "def".to_string(), ";".to_string()];
         }
         
     }

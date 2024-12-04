@@ -27,6 +27,7 @@ extern {
     "-" => Token::OperatorSub,
     "*" => Token::OperatorMul,
     "/" => Token::CmpToken,
+    "$" => Token::ProgramEnd,
     "add1" => Token::OperatorAdd1,
     "sub1" => Token::OperatorSub1,
     "let" => Token::KeywordLet,
@@ -71,7 +72,6 @@ pub VarBinding : (String, utils::Expr) = {
     (name, value)
   }
 }
-
 
 pub Expression: utils::Expr = {
   Term,

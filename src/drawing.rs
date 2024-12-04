@@ -15,9 +15,11 @@ pub fn draw_block(color: Color, op: &str, x: i32, y: i32, con: &Context, g: &mut
     let gui_x = to_gui_coord(x);
     let gui_y = to_gui_coord(y);
     let new_draw_state = con.draw_state.clone();
+    rectangle(color, [gui_x, gui_y,
+        BLOCK_SIZE, BLOCK_SIZE], con.transform, g);
 
     if op != "snake" {
-        text::Text::new_color([1.0, 1.0, 1.0, 1.0], 40) // Text color and font size
+        text::Text::new_color([1.0, 1.0, 1.0, 1.0], 10) // Text color and font size
             .draw(
                 op, // The text to display
                 font,
@@ -28,9 +30,6 @@ pub fn draw_block(color: Color, op: &str, x: i32, y: i32, con: &Context, g: &mut
             .unwrap_or_else(|e| {
                 eprintln!("Error drawing text: {:?}", e);  // Print error if text drawing fails
             });
-    } else {
-        rectangle(color, [gui_x, gui_y,
-            BLOCK_SIZE, BLOCK_SIZE], con.transform, g);
     }
 }
 
