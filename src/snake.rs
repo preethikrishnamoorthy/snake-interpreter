@@ -4,6 +4,7 @@ use std::collections::LinkedList;
 use piston_window::Context;
 use piston_window::G2d;
 use piston_window::types::Color;
+use piston_window::Glyphs;
 
 use super::drawing::draw_block;
 
@@ -63,9 +64,9 @@ impl Snake {
         }
     }
 
-    pub fn draw(&self, con: &Context, g: &mut G2d) {
+    pub fn draw(&self, con: &Context, g: &mut G2d, mut font: &mut Glyphs) {
         for block in &self.body {
-            draw_block(SNAKE_COLOR, block.x, block.y, con, g);
+            draw_block(SNAKE_COLOR, "snake", block.x, block.y, con, g, &mut font);
         }
     }
 

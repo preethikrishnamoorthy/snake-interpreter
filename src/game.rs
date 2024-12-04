@@ -92,11 +92,12 @@ impl Game {
         self.update_snake(dir);
     }
 
-    pub fn draw(&self, con: &Context, g: &mut G2d) {
-        self.snake.draw(con, g);
+    pub fn draw(&self, con: &Context, g: &mut G2d, mut font: &mut Glyphs) {
+        self.snake.draw(con, g, &mut font);
 
         for food in &self.food_list {
-            draw_block(Self::instr_to_color(food.instr.clone()), food.food_x, food.food_y, con, g);
+            draw_block(Self::instr_to_color(food.instr.clone()), 
+                &food.instr.clone(), food.food_x, food.food_y, con, g, font);
         }
 
         // Draw the border

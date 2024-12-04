@@ -32,11 +32,13 @@ fn main() {
         if let Some(Button::Keyboard(key)) = event.press_args() {
             game.key_pressed(key);
         }
+        
+        let mut font = window.load_font("src/Poppins-Bold.ttf").unwrap(); // Load a font
 
         // Draw all of them
         window.draw_2d(&event, |c, g, _| {
             clear(BACK_COLOR, g);
-            game.draw(&c, g);
+            game.draw(&c, g, &mut font);
         });
 
         // Update the state of the game

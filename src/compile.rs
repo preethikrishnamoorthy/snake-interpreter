@@ -17,12 +17,12 @@ use dynasmrt::{dynasm, DynasmApi};
 
 static JUMP_LABEL: LazyLock<Mutex<i32>> = LazyLock::new(|| 0.into());
 
-fn bool_to_num(b: &bool) -> i32 {
-    match b {
-        true => 1 as i32,
-        false => 0 as i32
-    }
-}
+// fn bool_to_num(b: &bool) -> i32 {
+//     match b {
+//         true => 1 as i32,
+//         false => 0 as i32
+//     }
+// }
 
 pub fn compile_to_instrs(e: &Expr, stack_bindings: im::HashMap<String, i32>, 
     mut variable_types: &mut HashMap<String, Type>, stack_counter: i32, 
