@@ -19,12 +19,12 @@ pub fn draw_block(color: Color, op: &str, x: i32, y: i32, con: &Context, g: &mut
         BLOCK_SIZE, BLOCK_SIZE], con.transform, g);
 
     if op != "snake" {
-        text::Text::new_color([1.0, 1.0, 1.0, 1.0], 10) // Text color and font size
+        text::Text::new_color([1.0, 1.0, 1.0, 1.0], 15) // Text color and font size
             .draw(
                 op, // The text to display
                 font,
                 &new_draw_state,
-                con.transform.trans(gui_x + BLOCK_SIZE / 2.0, gui_y + BLOCK_SIZE / 2.0),
+                con.transform.trans(gui_x + BLOCK_SIZE / 3.0, gui_y + BLOCK_SIZE / 2.0),
                 g,
             )
             .unwrap_or_else(|e| {

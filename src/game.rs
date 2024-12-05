@@ -46,28 +46,40 @@ pub struct Game {
     waiting_time: f64,
     is_def_line: bool,
     prog_line: String,
-    def_bindings: HashMap<String, i32>
+    def_bindings: HashMap<String, i32>,
+    temp_bindings: HashMap<String, i32>,
+    brace_count: i32,
+    is_var_binding: bool,
+    id_just_eaten: bool
 
 }
 
 impl Game {
     pub fn new(width: i32, height: i32) -> Game {
-        Game {
+        let mut g = Game {
             snake: Snake::new(2, 2),
             waiting_time: 0.0,
-            food_list: vec![Food {food_x: 5, food_y: 5, instr: "+".to_string()},
-                            Food {food_x: 7, food_y: 3, instr: "-".to_string()},
-                            Food {food_x: 2, food_y: 8, instr: "*".to_string()},
-                            Food {food_x: 8, food_y: 5, instr: "def".to_string()},
-                            Food {food_x: 6, food_y: 6, instr: ";".to_string()},
-            ],
+            // food_list: vec![Food {food_x: 5, food_y: 5, instr: "+".to_string()},
+            //                 Food {food_x: 7, food_y: 3, instr: "-".to_string()},
+            //                 Food {food_x: 2, food_y: 8, instr: "*".to_string()},
+            //                 Food {food_x: 8, food_y: 5, instr: "def".to_string()},
+            //                 Food {food_x: 6, food_y: 6, instr: ";".to_string()},
+            // ],
+            food_list: vec![],
             width: width,
             height: height,
             is_game_over: false,
             is_def_line: false,
             prog_line: "( ".to_string(),
             def_bindings: HashMap::new(),
-        }
+            temp_bindings: HashMap::new(),
+            brace_count: 0,
+            is_var_binding: false,
+            id_just_eaten: false
+        };
+        // make food list anything that could follow (
+        g.update_food("(".to_string());
+        g
     }
 
     pub fn key_pressed(&mut self, key: Key) {
@@ -133,6 +145,7 @@ impl Game {
             "}" => return [0.0, 0.5, 0.0, 1.0], // dark green
             "var" => return [0.0, 0.0, 0.5, 1.0], // navy blue
             ":=" => return [0.0, 0.5, 0.5, 1.0], // dark teal
+            "id" => return [1.0, 0.5, 0.5, 1.0], // salmon
             // identifier case
             _ => return FOOD_COLOR, // orange?
         }
@@ -173,6 +186,10 @@ impl Game {
             
             if instr_eaten == ";" {
                 self.prog_line.push_str(&next_num_instr);
+                // close any unclosed {
+                for _ in 0..self.brace_count {
+                    self.prog_line.push_str("}");
+                }
                 self.prog_line.push_str(&" )".to_string());
                 println!("{}", self.prog_line);
                 
@@ -188,11 +205,50 @@ impl Game {
                 if self.is_def_line {
                     self.def_bindings.insert("x".to_string() + &self.def_bindings.len().to_string(), res);
                 }
+                if self.is_var_binding {
+                    self.temp_bindings.insert("y".to_string() + &self.temp_bindings.len().to_string(), res);
+                    self.is_var_binding = false;
+                }
                 self.is_def_line = false;
             }
             
             else if instr_eaten == "def" {
                 self.is_def_line = true;
+            }
+
+            else if instr_eaten == "var" {
+                self.is_var_binding = true;
+            }
+
+            else if instr_eaten == "{" {
+                self.brace_count += 1;
+            }
+
+            else if instr_eaten == "}" {
+                self.brace_count -= 1;
+                self.temp_bindings.clear();
+            }
+
+            // ate heap variable
+            else if instr_eaten.chars().next().unwrap() == 'x' {
+                self.id_just_eaten = true;
+                self.prog_line.push_str(&" ".to_string());
+                match self.def_bindings.get(&instr_eaten) {
+                    Some(value) => self.prog_line.push_str(&value.to_string()),
+                    None => panic!("var {} not found in def bindings", instr_eaten)
+                }
+                self.prog_line.push_str(&" ".to_string());
+                
+            }
+            // ate temp variable
+            else if instr_eaten.chars().next().unwrap() == 'y' {
+                self.id_just_eaten = true;
+                self.prog_line.push_str(&" ".to_string());
+                match self.temp_bindings.get(&instr_eaten) {
+                    Some(value) => self.prog_line.push_str(&value.to_string()),
+                    None => panic!("var {} not found in temp bindings", instr_eaten)
+                }
+                self.prog_line.push_str(&" ".to_string());
             }
             
             else {
@@ -243,6 +299,7 @@ impl Game {
     }
 
     fn generate_instructions(&mut self, last_instr: String) -> Vec<String>{
+        // return set of next possible tokens based on what can follow last_instr
         println!("is_def_line: {}", self.is_def_line);
         if self.is_def_line {
             return vec!["+".to_string(), "-".to_string(), "*".to_string(), ";".to_string()];
@@ -251,54 +308,115 @@ impl Game {
                 return vec!["+".to_string(), "-".to_string(), "*".to_string(), ")".to_string(), ";".to_string()]
             }
             let mut var_names = vec![];
+            // add identifier names from heap bindings
             for (name, _) in self.def_bindings.clone().into_iter() {
                 var_names.push(name);
             }
+            // add identifier names from temporary let bindings
+            for (name, _) in self.temp_bindings.clone().into_iter() {
+                var_names.push(name);
+            }
+            let int_follow_set = vec!["+".to_string(), "-".to_string(), "*".to_string(), ")".to_string(), ";".to_string()];
+
             let mut next_instrs = vec!["def".to_string()];
             match last_instr.as_str() {
-                "(" => next_instrs.append(&mut vec!["(".to_string(), "let".to_string(), "set".to_string(), "add1".to_string(), "sub1".to_string()]),
+                "(" => {
+                    next_instrs.append(&mut vec!["(".to_string(), ")".to_string(), "let".to_string(), "set".to_string(), "add1".to_string(), "sub1".to_string()]);
+                    for s in int_follow_set {
+                        if ! next_instrs.contains(&s) {
+                            next_instrs.push(s);
+                        }
+                    }
+                },
                 ":=" => {
                     next_instrs.append(&mut vec!["(".to_string(), "let".to_string(), "set".to_string()]);
+                    for s in int_follow_set {
+                        if ! next_instrs.contains(&s) {
+                            next_instrs.push(s);
+                        }
+                    }
                     next_instrs.append(&mut var_names);
                 },
                 ")" => next_instrs.append(&mut vec!["+".to_string(), "-".to_string(), "*".to_string(), ")".to_string(), ";".to_string(), "}".to_string()]),
                 ";" => {
                     next_instrs.append(&mut vec!["var".to_string(), "let".to_string(), "set".to_string(), "}".to_string(), "(".to_string()]);
+                    for s in int_follow_set {
+                        if ! next_instrs.contains(&s) {
+                            next_instrs.push(s);
+                        }
+                    }
                     next_instrs.append(&mut var_names);
                 },
-                "var" => next_instrs.append(&mut var_names), 
+                "var" => next_instrs.push("id".to_string()), 
                 "let" => {
                     next_instrs.push("{".to_string());
-                    next_instrs.append(&mut var_names);
                 },
                 "set" => next_instrs.append(&mut var_names),
                 "{" => {
                     next_instrs.append(&mut vec!["let".to_string(), "set".to_string(), "(".to_string(), "var".to_string()]);
+                    for s in int_follow_set {
+                        if ! next_instrs.contains(&s) {
+                            next_instrs.push(s);
+                        }
+                    }
                     next_instrs.append(&mut var_names);
                 },
                 "}" => {
                     next_instrs.append(&mut vec!["let".to_string(), "set".to_string(), "(".to_string(), "{".to_string(), "}".to_string()]);
+                    for s in int_follow_set {
+                        if ! next_instrs.contains(&s) {
+                            next_instrs.push(s);
+                        }
+                    }
                     next_instrs.append(&mut var_names);
                 }, 
                 "+" => {
                     next_instrs.append(&mut vec!["(".to_string(), "add1".to_string(), "sub1".to_string()]);
+                    for s in int_follow_set {
+                        if ! next_instrs.contains(&s) {
+                            next_instrs.push(s);
+                        }
+                    }
                     next_instrs.append(&mut var_names);
                 },
                 "-" => {
                     next_instrs.append(&mut vec!["(".to_string(), "add1".to_string(), "sub1".to_string()]);
+                    for s in int_follow_set {
+                        if ! next_instrs.contains(&s) {
+                            next_instrs.push(s);
+                        }
+                    }
                     next_instrs.append(&mut var_names);
                 }, 
                 "*" => {
                     next_instrs.append(&mut vec!["(".to_string(), "add1".to_string(), "sub1".to_string()]);
+                    for s in int_follow_set {
+                        if ! next_instrs.contains(&s) {
+                            next_instrs.push(s);
+                        }
+                    }
                     next_instrs.append(&mut var_names);
                 },
                 "add1" => {
                     next_instrs.push("(".to_string());
+                    for s in int_follow_set {
+                        if ! next_instrs.contains(&s) {
+                            next_instrs.push(s);
+                        }
+                    }
                     next_instrs.append(&mut var_names);
                 }, 
                 "sub1" => {
                     next_instrs.push("(".to_string());
+                    for s in int_follow_set {
+                        if ! next_instrs.contains(&s) {
+                            next_instrs.push(s);
+                        }
+                    }
                     next_instrs.append(&mut var_names);
+                }, 
+                "id" => {
+                    next_instrs.push(":=".to_string());
                 }, 
                 // identifier case
                 _ => next_instrs.append(&mut vec!["+".to_string(), "-".to_string(), "*".to_string(), ":=".to_string(), ")".to_string(), ";".to_string(), "}".to_string()]),
@@ -356,11 +474,12 @@ impl Game {
     fn restart(&mut self) {
         self.snake = Snake::new(2, 2);
         self.waiting_time = 0.0;
-        self.update_food("".to_string());
+        self.update_food("(".to_string());
         self.is_game_over = false;
         self.prog_line = "( ".to_string();
         self.is_def_line = false;
         self.def_bindings = HashMap::new();
+        self.temp_bindings = HashMap::new();
         // self.finished_prog_line = false;
     }
 }

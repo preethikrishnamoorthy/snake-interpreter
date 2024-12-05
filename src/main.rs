@@ -10,7 +10,8 @@ use snake_interpreter::drawing::to_gui_coord_u32;
 const BACK_COLOR: Color = [0.204, 0.286, 0.369, 1.0];
 
 fn main() {
-    let (width, height) = (20, 20);
+    let (width, height) = (40, 20);
+    let game_window_width = (to_gui_coord_u32(width) as f64) / 2.0;
 
     // Prepare window settings
     let mut window_settings = WindowSettings::new("Snake to Snek",
@@ -23,7 +24,7 @@ fn main() {
     let mut window: PistonWindow = window_settings.build().unwrap();
 
     // Create a snake
-    let mut game = Game::new(width, height);
+    let mut game = Game::new(width / 2, height);
     let mut game_started = false;
     let mut font = window.load_font("src/Poppins-Bold.ttf").unwrap(); // Load a font
 
@@ -37,9 +38,28 @@ fn main() {
             }
 
             // Draw all of them
-            window.draw_2d(&event, |c, g, _| {
+            window.draw_2d(&event, |c, g, device| {
                 clear(BACK_COLOR, g);
+                line(
+                    [0.0, 0.0, 1.0, 1.0],
+                    2.0, // line thickness
+                    [game_window_width, 0.0, game_window_width, to_gui_coord_u32(height) as f64],
+                    c.transform,
+                    g,
+                );
+                let transform = c.transform.trans(700.0, 30.0); // Position for the text
+                text::Text::new_color([1.0, 1.0, 1.0, 1.0], 30)
+                    .draw(
+                        "Code",
+                        &mut font,
+                        &DrawState::default(),
+                        transform,
+                        g,
+                    )
+                    .unwrap();
+                font.factory.encoder.flush(device);
                 game.draw(&c, g, &mut font);
+                font.factory.encoder.flush(device);
             });
 
             // Update the state of the game
@@ -54,11 +74,11 @@ fn main() {
             if let Some(Button::Keyboard(Key::S)) = event.press_args() {
                 game_started = true; // Start the game when "S" is pressed
             }
-            window.draw_2d(&event, |c, g, _device| {
-                clear([0.5, 0.5, 0.5, 1.0], g); // Gray background for the start screen
+            window.draw_2d(&event, |c, g, device| {
+                clear(BACK_COLOR, g); // Gray background for the start screen
 
-                let transform = c.transform.trans(200.0, 240.0); // Position for the text
-                text::Text::new_color([0.0, 0.0, 0.0, 1.0], 32)
+                let transform = c.transform.trans(400.0, 240.0); // Position for the text
+                text::Text::new_color([1.0, 1.0, 1.0, 1.0], 32)
                     .draw(
                         "Press 'S' to Start",
                         &mut font,
@@ -67,6 +87,7 @@ fn main() {
                         g,
                     )
                     .unwrap();
+                font.factory.encoder.flush(device);
             });
         }
 
