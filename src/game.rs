@@ -12,7 +12,7 @@ use super::grammar::ExpressionParser;
 use std::mem;
 use dynasmrt::{dynasm, DynasmApi};
 
-use super::drawing::{draw_block, draw_rectange};
+use super::drawing::{draw_block, draw_rectange, draw_program_line, draw_blocks_count};
 use rand::{thread_rng, Rng};
 use super::snake::{Direction, Snake};
 
@@ -29,12 +29,19 @@ pub struct Food {
     instr: String,
 }
 
+pub struct Program {
+    line: String,
+    y_value: i32,
+    result: Option<i32>,
+}
+
 pub struct Game {
     snake: Snake,
 
     // Food
     food_list: Vec<Food>,
     // Game Space
+    window_start_x: i32,
     width: i32,
     height: i32,
 
@@ -46,18 +53,22 @@ pub struct Game {
     waiting_time: f64,
     is_def_line: bool,
     prog_line: String,
+    program: Vec<Program>,
     def_bindings: HashMap<String, i32>,
     temp_bindings: HashMap<String, i32>,
     brace_count: i32,
+    paren_count: i32,
     is_var_binding: bool,
-    id_just_eaten: bool
+    id_just_eaten: bool,
+    prog_print_x: i32,
+    prog_print_y: i32
 
 }
 
 impl Game {
-    pub fn new(width: i32, height: i32) -> Game {
+    pub fn new(start_x: i32, width: i32, height: i32) -> Game {
         let mut g = Game {
-            snake: Snake::new(2, 2),
+            snake: Snake::new(start_x + 2, 2),
             waiting_time: 0.0,
             // food_list: vec![Food {food_x: 5, food_y: 5, instr: "+".to_string()},
             //                 Food {food_x: 7, food_y: 3, instr: "-".to_string()},
@@ -66,16 +77,21 @@ impl Game {
             //                 Food {food_x: 6, food_y: 6, instr: ";".to_string()},
             // ],
             food_list: vec![],
+            window_start_x: start_x,
             width: width,
             height: height,
             is_game_over: false,
             is_def_line: false,
             prog_line: "( ".to_string(),
+            program: vec![],
             def_bindings: HashMap::new(),
             temp_bindings: HashMap::new(),
             brace_count: 0,
+            paren_count: 0,
             is_var_binding: false,
-            id_just_eaten: false
+            id_just_eaten: false,
+            prog_print_x: start_x + width + 1,
+            prog_print_y: 2
         };
         // make food list anything that could follow (
         g.update_food("(".to_string());
@@ -113,14 +129,21 @@ impl Game {
         }
 
         // Draw the border
-        draw_rectange(BORDER_COLOR, 0, 0, self.width, 1, con, g);
-        draw_rectange(BORDER_COLOR, 0, self.height - 1, self.width, 1, con, g);
-        draw_rectange(BORDER_COLOR, 0, 0, 1, self.height, con, g);
-        draw_rectange(BORDER_COLOR, self.width - 1, 0, 1, self.height, con, g);
+        draw_rectange(BORDER_COLOR, self.window_start_x, 0, self.width, 1, con, g); // top
+        draw_rectange(BORDER_COLOR, self.window_start_x, self.height - 1, self.width, 1, con, g); // bottom
+        draw_rectange(BORDER_COLOR, self.window_start_x, 0, 1, self.height, con, g); // left
+        draw_rectange(BORDER_COLOR, self.window_start_x + self.width - 1, 0, 1, self.height, con, g); // right
+
+        draw_blocks_count(self.snake.blocks_traveled(), con, g, font);
+
+        for program in &self.program {
+            draw_program_line(program.line.clone(), program.result, self.prog_print_x, program.y_value, con, g, font);
+        }
+        draw_program_line(self.prog_line.clone(), None, self.prog_print_x, self.prog_print_y, con, g, font);
 
         // Draw a game-over rectangle
         if self.is_game_over {
-            draw_rectange(GAMEOVER_COLOR, 0, 0, self.width, self.height, con, g);
+            draw_rectange(GAMEOVER_COLOR, self.window_start_x, 0, self.width, self.height, con, g);
         }
     }
 
@@ -183,82 +206,125 @@ impl Game {
         if instr_eaten != "" {
             let next_num_instr = self.snake.blocks_traveled().to_string();
             self.snake.reset_blocks_traveled();
+
+            match instr_eaten.as_str() {
+                ";" => {
+                    // add number of blocks moved by snake to program
+                    self.prog_line.push_str(&next_num_instr);
+                    // close any unclosed {
+                    for _ in 0..self.brace_count {
+                        self.prog_line.push_str("}");
+                    }
+                    // close paren in program
+                    self.prog_line.push_str(&" )".to_string());
+                    println!("{}", self.prog_line);
+                    
+                    if self.is_def_line {
+                        println!("saving result to var number {}", self.def_bindings.len());
+                    }
+
+                    let res = self.run_line();
+
+                    println!("res of running prev line: {}", res);
+
+                    self.program.push(Program{
+                        line: self.prog_line.clone(), 
+                        y_value: self.prog_print_y, 
+                        result: Some(res)
+                    });
+
+                    // move y to next line so that new prog line is printed below
+                    self.prog_print_y += 1;
+
+                    // save result of program line to heap or temp binding
+                    if self.is_def_line {
+                        self.def_bindings.insert("x".to_string() + &self.def_bindings.len().to_string(), res);
+                    }
+                    if self.is_var_binding {
+                        self.temp_bindings.insert("y".to_string() + &self.temp_bindings.len().to_string(), res);
+                        self.is_var_binding = false;
+                    }
+
+                    // start new program line
+                    self.prog_line = "( ".to_string();
+
+                    self.is_def_line = false;
+                },
+                "def" => self.is_def_line = true,
+                "var" => self.is_var_binding = true,
+                "let" => {
+                    self.prog_line.push_str(&" ".to_string());
+                    self.prog_line.push_str(&instr_eaten.clone());
+                    self.prog_line.push_str(&" { ".to_string());
+                }
+                "{" => {
+                    self.brace_count += 1;
+                    self.prog_line.push_str(&" { ".to_string());
+                },
+                // assuming that the let finished so temp bindings go out of scope
+                "}" => {
+                    self.brace_count -= 1;
+                    self.temp_bindings.clear();
+                    self.prog_line.push_str(&" } ".to_string());
+                },
+                ")" => {
+                    self.paren_count -= 1;
+                    if ! self.id_just_eaten {
+                        self.prog_line.push_str(&next_num_instr);
+                        self.id_just_eaten = false;
+                    }
+                    self.prog_line.push_str(&" ".to_string());
+                    self.prog_line.push_str(&instr_eaten.clone());
+                    self.prog_line.push_str(&" ".to_string());
+                },
+                "+"| "-" | "*" => {
+                    // if an existing var was eaten before this instr, don't add number of blocks moved to program
+                    if ! self.id_just_eaten {
+                        self.prog_line.push_str(&next_num_instr);
+                        self.id_just_eaten = false;
+                    }
+                    self.prog_line.push_str(&" ".to_string());
+                    self.prog_line.push_str(&instr_eaten.clone());
+                    self.prog_line.push_str(&" ".to_string());
+                },
+                "(" => {
+                    self.paren_count += 1;
+                    self.prog_line.push_str(&instr_eaten.clone());
+                    self.prog_line.push_str(&" ".to_string());
+                },
+                ":=" | "add1" | "sub1" => {
+                    self.prog_line.push_str(&instr_eaten.clone());
+                    self.prog_line.push_str(&" ".to_string());
+                },
+                _ => {
+                    // just ate a heap variable
+                    if instr_eaten.chars().next().unwrap() == 'x' {
+                        self.id_just_eaten = true;
+                        self.prog_line.push_str(&" ".to_string());
+                        match self.def_bindings.get(&instr_eaten) {
+                            Some(value) => self.prog_line.push_str(&value.to_string()),
+                            None => panic!("var {} not found in def bindings", instr_eaten)
+                        }
+                    }
+                    // just ate a temp variable
+                    else if instr_eaten.chars().next().unwrap() == 'y' {
+                        self.id_just_eaten = true;
+                        self.prog_line.push_str(&" ".to_string());
+                        match self.temp_bindings.get(&instr_eaten) {
+                            Some(value) => self.prog_line.push_str(&value.to_string()),
+                            None => panic!("var {} not found in temp bindings", instr_eaten)
+                        }
+                    }
+                    else {
+                        println!("ate instr: {}", &instr_eaten.clone());
+                        // self.prog_line.push_str(&next_num_instr);
+                        self.prog_line.push_str(&" ".to_string());
+                        self.prog_line.push_str(&instr_eaten.clone());
+                        self.prog_line.push_str(&" ".to_string());
+                    }
+                }
+            }
             
-            if instr_eaten == ";" {
-                self.prog_line.push_str(&next_num_instr);
-                // close any unclosed {
-                for _ in 0..self.brace_count {
-                    self.prog_line.push_str("}");
-                }
-                self.prog_line.push_str(&" )".to_string());
-                println!("{}", self.prog_line);
-                
-                if self.is_def_line {
-                    println!("saving result to var number {}", self.def_bindings.len());
-                }
-
-                let res = self.run_line();
-
-                println!("res of running prev line: {}", res);
-
-                self.prog_line = "( ".to_string();
-                if self.is_def_line {
-                    self.def_bindings.insert("x".to_string() + &self.def_bindings.len().to_string(), res);
-                }
-                if self.is_var_binding {
-                    self.temp_bindings.insert("y".to_string() + &self.temp_bindings.len().to_string(), res);
-                    self.is_var_binding = false;
-                }
-                self.is_def_line = false;
-            }
-            
-            else if instr_eaten == "def" {
-                self.is_def_line = true;
-            }
-
-            else if instr_eaten == "var" {
-                self.is_var_binding = true;
-            }
-
-            else if instr_eaten == "{" {
-                self.brace_count += 1;
-            }
-
-            else if instr_eaten == "}" {
-                self.brace_count -= 1;
-                self.temp_bindings.clear();
-            }
-
-            // ate heap variable
-            else if instr_eaten.chars().next().unwrap() == 'x' {
-                self.id_just_eaten = true;
-                self.prog_line.push_str(&" ".to_string());
-                match self.def_bindings.get(&instr_eaten) {
-                    Some(value) => self.prog_line.push_str(&value.to_string()),
-                    None => panic!("var {} not found in def bindings", instr_eaten)
-                }
-                self.prog_line.push_str(&" ".to_string());
-                
-            }
-            // ate temp variable
-            else if instr_eaten.chars().next().unwrap() == 'y' {
-                self.id_just_eaten = true;
-                self.prog_line.push_str(&" ".to_string());
-                match self.temp_bindings.get(&instr_eaten) {
-                    Some(value) => self.prog_line.push_str(&value.to_string()),
-                    None => panic!("var {} not found in temp bindings", instr_eaten)
-                }
-                self.prog_line.push_str(&" ".to_string());
-            }
-            
-            else {
-                println!("ate instr: {}", &instr_eaten.clone());
-                self.prog_line.push_str(&next_num_instr);
-                self.prog_line.push_str(&" ".to_string());
-                self.prog_line.push_str(&instr_eaten.clone());
-                self.prog_line.push_str(&" ".to_string());
-            }
-
             self.update_food(instr_eaten.clone());
             self.snake.restore_last_removed();
         }
@@ -273,7 +339,7 @@ impl Game {
         }
 
         // Check if the snake overlaps with the border
-        next_x > 0 && next_y > 0 && next_x < self.width - 1 && next_y < self.height - 1
+        next_x > self.window_start_x && next_y > 0 && next_x < self.width + self.window_start_x - 1 && next_y < self.height - 1
     }
 
     fn update_food(&mut self, last_instr: String) {
@@ -282,10 +348,10 @@ impl Game {
 
         self.food_list = vec![];
         for instr in next_instrs {
-            let mut new_x = rng.gen_range(1..(self.width - 1));
+            let mut new_x = rng.gen_range((self.window_start_x + 1)..(self.width - 1));
             let mut new_y = rng.gen_range(1..(self.height - 1));
             while self.snake.is_overlap_except_tail(new_x, new_y) {
-                new_x = rng.gen_range(1..(self.width - 1));
+                new_x = rng.gen_range((self.window_start_x + 1)..(self.width - 1));
                 new_y = rng.gen_range(1..(self.height - 1));
             }
 
@@ -348,11 +414,8 @@ impl Game {
                     next_instrs.append(&mut var_names);
                 },
                 "var" => next_instrs.push("id".to_string()), 
-                "let" => {
-                    next_instrs.push("{".to_string());
-                },
                 "set" => next_instrs.append(&mut var_names),
-                "{" => {
+                "let" | "{" => {
                     next_instrs.append(&mut vec!["let".to_string(), "set".to_string(), "(".to_string(), "var".to_string()]);
                     for s in int_follow_set {
                         if ! next_instrs.contains(&s) {
@@ -421,6 +484,11 @@ impl Game {
                 // identifier case
                 _ => next_instrs.append(&mut vec!["+".to_string(), "-".to_string(), "*".to_string(), ":=".to_string(), ")".to_string(), ";".to_string(), "}".to_string()]),
             }
+            // remove ) from next instr if parens are balanced
+            if self.paren_count == 0 {
+                next_instrs.retain(|x| x != ")");
+            }
+            
             return next_instrs;
             // return vec!["+".to_string(), "-".to_string(), "*".to_string(), "def".to_string(), ";".to_string()];
         }
@@ -447,8 +515,7 @@ impl Game {
         
         match ast {
             Err(error_message) => {
-                println!("{}", error_message);
-                return -1;
+                panic!("{}", error_message);
             }
             Ok(expression) => {
                 println!("{:?}", expression);
@@ -472,7 +539,7 @@ impl Game {
     }
 
     fn restart(&mut self) {
-        self.snake = Snake::new(2, 2);
+        self.snake = Snake::new(self.window_start_x + 2, 2);
         self.waiting_time = 0.0;
         self.update_food("(".to_string());
         self.is_game_over = false;
