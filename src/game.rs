@@ -21,7 +21,7 @@ const BORDER_COLOR: Color = [0.741, 0.765, 0.78, 1.0];
 const GAMEOVER_COLOR: Color = [0.91, 0.30, 0.24, 0.5];
 
 const MOVING_PERIOD: f64 = 0.2; // in second
-const RESTART_TIME: f64 = 1.0; // in second
+// const RESTART_TIME: f64 = 1.0; // in second
 
 pub struct Food {
     food_x: i32,
@@ -33,6 +33,14 @@ pub struct Program {
     line: String,
     y_value: i32,
     result: Option<i32>,
+}
+
+#[derive(Debug)]
+pub enum GameState {
+    StartScreen,
+    GameStarted,
+    SnakeDied,
+    ReachedGoal
 }
 
 pub struct Game {
@@ -61,12 +69,14 @@ pub struct Game {
     is_var_binding: bool,
     id_just_eaten: bool,
     prog_print_x: i32,
-    prog_print_y: i32
+    prog_print_y: i32,
+    reached_goal: bool,
+    goal: i32,
 
 }
 
 impl Game {
-    pub fn new(start_x: i32, width: i32, height: i32) -> Game {
+    pub fn new(start_x: i32, width: i32, height: i32, start_goal: i32) -> Game {
         let mut g = Game {
             snake: Snake::new(start_x + 2, 2),
             waiting_time: 0.0,
@@ -91,7 +101,10 @@ impl Game {
             is_var_binding: false,
             id_just_eaten: false,
             prog_print_x: start_x + width + 1,
-            prog_print_y: 2
+            prog_print_y: 4,
+            reached_goal: false,
+            goal: start_goal,
+
         };
         // make food list anything that could follow (
         g.update_food("(".to_string());
@@ -175,21 +188,39 @@ impl Game {
         
     }    
 
-    pub fn update(&mut self, delta_time: f64) {
+    pub fn update(&mut self, delta_time: f64) -> GameState {
         self.waiting_time += delta_time;
 
-        // If the game is over
+        let mut final_state = GameState::GameStarted;
+
         if self.is_game_over {
-            if self.waiting_time > RESTART_TIME {
-                self.restart();
-            }
-            return;
+            final_state = GameState::SnakeDied
+        } else if self.reached_goal {
+            final_state = GameState::ReachedGoal
         }
 
-        // Move the snake
-        if self.waiting_time > MOVING_PERIOD {
-            self.update_snake(None);
+        // If the game is over
+        if self.is_game_over || self.reached_goal {
+            // if self.waiting_time > RESTART_TIME {
+                self.restart();
+                self.is_game_over = false;
+            // }
+            return final_state;
         }
+        else {
+            // Move the snake
+
+            if self.waiting_time > MOVING_PERIOD {
+                self.update_snake(None);
+            }
+
+            println!("UPDATED GAME STATE: {:#?}", final_state);
+
+            return final_state;
+        }
+        
+
+        
     }
 
     fn check_eating(&mut self) {
@@ -226,6 +257,10 @@ impl Game {
                     let res = self.run_line();
 
                     println!("res of running prev line: {}", res);
+
+                    if res == self.goal {
+                        self.reached_goal = true;
+                    }
 
                     self.program.push(Program{
                         line: self.prog_line.clone(), 
@@ -361,7 +396,7 @@ impl Game {
                 instr: instr.to_string(),
             };
             self.food_list.push(new_food);
-        }        
+        }
     }
 
     fn generate_instructions(&mut self, last_instr: String) -> Vec<String>{
@@ -500,6 +535,7 @@ impl Game {
             self.snake.move_forward(dir);
             self.check_eating();
         } else {
+            // println!("UPDATE SNAKE GAME OVER");
             self.is_game_over = true;
         }
         self.waiting_time = 0.0;
@@ -547,6 +583,7 @@ impl Game {
         self.is_def_line = false;
         self.def_bindings = HashMap::new();
         self.temp_bindings = HashMap::new();
-        // self.finished_prog_line = false;
+        self.reached_goal = false;
+
     }
 }
