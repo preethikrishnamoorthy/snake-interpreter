@@ -42,6 +42,25 @@ pub fn draw_rectange(color: Color, start_x: i32, start_y: i32, width: i32, heigh
             BLOCK_SIZE * (width as f64), BLOCK_SIZE * (height as f64)], con.transform, g);
 }
 
+// used to draw heap and temp vars
+pub fn draw_text(text: String, color: Color, start_x: f64, start_y: f64, con: &Context, g: &mut G2d, font: &mut Glyphs) {
+    // let gui_x = to_gui_coord(start_x);
+    // let gui_y = to_gui_coord(start_y);
+    let new_draw_state = con.draw_state.clone();
+
+    text::Text::new_color(color, 18) // Text color and font size
+        .draw(
+            &text.to_string(),
+            font,
+            &new_draw_state,
+            con.transform.trans(start_x, start_y),
+            g,
+        )
+        .unwrap_or_else(|e| {
+            eprintln!("Error drawing text: {:?}", e);  // Print error if text drawing fails
+        });
+}
+
 pub fn draw_blocks_count(blocks_num: i64, con: &Context, g: &mut G2d, font: &mut Glyphs) {
     // Get the width of the Block Count string
     let width: f64 = "Block Count: "

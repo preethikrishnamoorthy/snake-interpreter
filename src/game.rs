@@ -12,7 +12,7 @@ use super::grammar::ExpressionParser;
 use std::mem;
 use dynasmrt::{dynasm, DynasmApi};
 
-use super::drawing::{draw_block, draw_rectange, draw_program_line, draw_blocks_count};
+use super::drawing::{draw_block, draw_rectange, draw_program_line, draw_blocks_count, draw_text};
 use rand::{thread_rng, Rng};
 use super::snake::{Direction, Snake};
 
@@ -54,8 +54,8 @@ pub struct Game {
     is_def_line: bool,
     prog_line: String,
     program: Vec<Program>,
-    def_bindings: HashMap<String, i32>,
-    temp_bindings: HashMap<String, i32>,
+    def_bindings: Vec<i32>,
+    temp_bindings: Vec<i32>,
     brace_count: i32,
     paren_count: i32,
     is_var_binding: bool,
@@ -84,8 +84,8 @@ impl Game {
             is_def_line: false,
             prog_line: "( ".to_string(),
             program: vec![],
-            def_bindings: HashMap::new(),
-            temp_bindings: HashMap::new(),
+            def_bindings: vec![],
+            temp_bindings: vec![],
             brace_count: 0,
             paren_count: 0,
             is_var_binding: false,
@@ -135,6 +135,30 @@ impl Game {
         draw_rectange(BORDER_COLOR, self.window_start_x + self.width - 1, 0, 1, self.height, con, g); // right
 
         draw_blocks_count(self.snake.blocks_traveled(), con, g, font);
+
+        // draw heap variables and their values
+        let heap_x = 20.0;
+        let mut heap_y = 70.0;
+        for (var_num, value) in self.def_bindings.clone().into_iter().enumerate() {
+            let mut text_to_draw = "x".to_string();
+            text_to_draw.push_str(&var_num.to_string());
+            text_to_draw.push_str(": ");
+            text_to_draw.push_str(&value.to_string());
+            draw_text(text_to_draw, [1.0, 1.0, 1.0, 1.0], heap_x, heap_y, con, g, font);
+            heap_y += 20.0;
+        }
+
+        let temp_x = 140.0;
+        let mut temp_y = 70.0;
+        // draw temp variables and their values
+        for (var_num, value) in self.temp_bindings.clone().into_iter().enumerate() {
+            let mut text_to_draw = "y".to_string();
+            text_to_draw.push_str(&var_num.to_string());
+            text_to_draw.push_str(": ");
+            text_to_draw.push_str(&value.to_string());
+            draw_text(text_to_draw, [1.0, 1.0, 1.0, 1.0], temp_x, temp_y, con, g, font);
+            temp_y += 20.0;
+        }
 
         for program in &self.program {
             draw_program_line(program.line.clone(), program.result, self.prog_print_x, program.y_value, con, g, font);
@@ -238,10 +262,10 @@ impl Game {
 
                     // save result of program line to heap or temp binding
                     if self.is_def_line {
-                        self.def_bindings.insert("x".to_string() + &self.def_bindings.len().to_string(), res);
+                        self.def_bindings.push(res);
                     }
                     if self.is_var_binding {
-                        self.temp_bindings.insert("y".to_string() + &self.temp_bindings.len().to_string(), res);
+                        self.temp_bindings.push(res);
                         self.is_var_binding = false;
                     }
 
@@ -249,10 +273,12 @@ impl Game {
                     self.prog_line = "( ".to_string();
 
                     self.is_def_line = false;
+                    self.id_just_eaten = false;
                 },
                 "def" => self.is_def_line = true,
                 "var" => self.is_var_binding = true,
                 "let" => {
+                    self.id_just_eaten = false;
                     self.prog_line.push_str(&" ".to_string());
                     self.prog_line.push_str(&instr_eaten.clone());
                     self.prog_line.push_str(&" { ".to_string());
@@ -263,6 +289,7 @@ impl Game {
                 },
                 // assuming that the let finished so temp bindings go out of scope
                 "}" => {
+                    self.id_just_eaten = false;
                     self.brace_count -= 1;
                     self.temp_bindings.clear();
                     self.prog_line.push_str(&" } ".to_string());
@@ -288,11 +315,13 @@ impl Game {
                     self.prog_line.push_str(&" ".to_string());
                 },
                 "(" => {
+                    self.id_just_eaten = false;
                     self.paren_count += 1;
                     self.prog_line.push_str(&instr_eaten.clone());
                     self.prog_line.push_str(&" ".to_string());
                 },
                 ":=" | "add1" | "sub1" => {
+                    self.id_just_eaten = false;
                     self.prog_line.push_str(&instr_eaten.clone());
                     self.prog_line.push_str(&" ".to_string());
                 },
@@ -301,18 +330,22 @@ impl Game {
                     if instr_eaten.chars().next().unwrap() == 'x' {
                         self.id_just_eaten = true;
                         self.prog_line.push_str(&" ".to_string());
-                        match self.def_bindings.get(&instr_eaten) {
-                            Some(value) => self.prog_line.push_str(&value.to_string()),
-                            None => panic!("var {} not found in def bindings", instr_eaten)
+                        let var_num = instr_eaten.chars().nth(1).unwrap().to_digit(10).unwrap() as usize;
+                        if var_num < self.def_bindings.len() {
+                            self.prog_line.push_str(&self.def_bindings[var_num].to_string());
+                        } else {
+                            panic!("var {} not found in def bindings {}", instr_eaten, var_num)
                         }
                     }
                     // just ate a temp variable
                     else if instr_eaten.chars().next().unwrap() == 'y' {
                         self.id_just_eaten = true;
                         self.prog_line.push_str(&" ".to_string());
-                        match self.temp_bindings.get(&instr_eaten) {
-                            Some(value) => self.prog_line.push_str(&value.to_string()),
-                            None => panic!("var {} not found in temp bindings", instr_eaten)
+                        let var_num = instr_eaten.chars().nth(1).unwrap().to_digit(10).unwrap() as usize;
+                        if var_num < self.temp_bindings.len() {
+                            self.prog_line.push_str(&self.temp_bindings[var_num].to_string());
+                        } else {
+                            panic!("var {} not found in temp bindings {}", instr_eaten, var_num)
                         }
                     }
                     else {
@@ -375,61 +408,80 @@ impl Game {
             }
             let mut var_names = vec![];
             // add identifier names from heap bindings
-            for (name, _) in self.def_bindings.clone().into_iter() {
-                var_names.push(name);
+            for idx in 0..self.def_bindings.len() {
+                let mut var_name = "x".to_string();
+                var_name.push_str(&idx.to_string());
+                var_names.push(var_name);
             }
             // add identifier names from temporary let bindings
-            for (name, _) in self.temp_bindings.clone().into_iter() {
-                var_names.push(name);
+            for idx in 0..self.temp_bindings.len() {
+                let mut var_name = "y".to_string();
+                var_name.push_str(&idx.to_string());
+                var_names.push(var_name);
             }
             let int_follow_set = vec!["+".to_string(), "-".to_string(), "*".to_string(), ")".to_string(), ";".to_string()];
 
             let mut next_instrs = vec!["def".to_string()];
             match last_instr.as_str() {
                 "(" => {
-                    next_instrs.append(&mut vec!["(".to_string(), ")".to_string(), "let".to_string(), "set".to_string(), "add1".to_string(), "sub1".to_string()]);
+                    next_instrs.append(&mut vec!["(".to_string(), ")".to_string(), "let".to_string(), "add1".to_string(), "sub1".to_string()]);
                     for s in int_follow_set {
                         if ! next_instrs.contains(&s) {
                             next_instrs.push(s);
                         }
                     }
+                    if self.temp_bindings.len() > 0 || self.def_bindings.len() > 0 {
+                        next_instrs.push("set".to_string());
+                    }
                 },
                 ":=" => {
-                    next_instrs.append(&mut vec!["(".to_string(), "let".to_string(), "set".to_string()]);
+                    next_instrs.append(&mut vec!["(".to_string(), "let".to_string()]);
                     for s in int_follow_set {
                         if ! next_instrs.contains(&s) {
                             next_instrs.push(s);
                         }
+                    }
+                    if self.temp_bindings.len() > 0 || self.def_bindings.len() > 0 {
+                        next_instrs.push("set".to_string());
                     }
                     next_instrs.append(&mut var_names);
                 },
                 ")" => next_instrs.append(&mut vec!["+".to_string(), "-".to_string(), "*".to_string(), ")".to_string(), ";".to_string(), "}".to_string()]),
                 ";" => {
-                    next_instrs.append(&mut vec!["var".to_string(), "let".to_string(), "set".to_string(), "}".to_string(), "(".to_string()]);
+                    next_instrs.append(&mut vec!["var".to_string(), "let".to_string(), "}".to_string(), "(".to_string()]);
                     for s in int_follow_set {
                         if ! next_instrs.contains(&s) {
                             next_instrs.push(s);
                         }
+                    }
+                    if self.temp_bindings.len() > 0 || self.def_bindings.len() > 0 {
+                        next_instrs.push("set".to_string());
                     }
                     next_instrs.append(&mut var_names);
                 },
                 "var" => next_instrs.push("id".to_string()), 
                 "set" => next_instrs.append(&mut var_names),
                 "let" | "{" => {
-                    next_instrs.append(&mut vec!["let".to_string(), "set".to_string(), "(".to_string(), "var".to_string()]);
+                    next_instrs.append(&mut vec!["let".to_string(), "(".to_string(), "var".to_string()]);
                     for s in int_follow_set {
                         if ! next_instrs.contains(&s) {
                             next_instrs.push(s);
                         }
                     }
+                    if self.temp_bindings.len() > 0 || self.def_bindings.len() > 0 {
+                        next_instrs.push("set".to_string());
+                    }
                     next_instrs.append(&mut var_names);
                 },
                 "}" => {
-                    next_instrs.append(&mut vec!["let".to_string(), "set".to_string(), "(".to_string(), "{".to_string(), "}".to_string()]);
+                    next_instrs.append(&mut vec!["let".to_string(), "(".to_string(), "{".to_string(), "}".to_string()]);
                     for s in int_follow_set {
                         if ! next_instrs.contains(&s) {
                             next_instrs.push(s);
                         }
+                    }
+                    if self.temp_bindings.len() > 0 || self.def_bindings.len() > 0 {
+                        next_instrs.push("set".to_string());
                     }
                     next_instrs.append(&mut var_names);
                 }, 
@@ -522,8 +574,14 @@ impl Game {
                 let mut ops = dynasmrt::x64::Assembler::new().unwrap();
                 let start = ops.offset();
         
+                let mut compilation_bindings = HashMap::new();
+                for (idx, value) in self.def_bindings.clone().into_iter().enumerate() {
+                    let mut var_name = "x".to_string();
+                    var_name.push_str(&idx.to_string());
+                    compilation_bindings.insert(var_name, value);
+                }
                 let instrs = compile_to_instrs(&expression, stack_bindings, &mut variable_types,
-                    0, &self.def_bindings);
+                    0, &compilation_bindings);
                 println!("{:?}", instrs);
                 instrs_to_asm(&instrs, &mut ops);
                 dynasm!(ops
@@ -545,8 +603,8 @@ impl Game {
         self.is_game_over = false;
         self.prog_line = "( ".to_string();
         self.is_def_line = false;
-        self.def_bindings = HashMap::new();
-        self.temp_bindings = HashMap::new();
+        self.def_bindings = vec![];
+        self.temp_bindings = vec![];
         // self.finished_prog_line = false;
     }
 }
