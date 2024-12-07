@@ -52,7 +52,7 @@ fn main() {
                 window.draw_2d(&event, |c, g, device| {
                     clear(BACK_COLOR, g); // Gray background for the start screen
     
-                    let transform = c.transform.trans(400.0, 240.0); // Position for the text
+                    let transform = c.transform.trans(500.0, 240.0); // Position for the text
                     text::Text::new_color([1.0, 1.0, 1.0, 1.0], 32)
                         .draw(
                             "Press 'S' to Start",
@@ -166,7 +166,6 @@ fn main() {
                 // Update the state of the game
                 event.update(|arg| {
                     curr_game_state = game.update(arg.dt);
-                    println!("MAIN: {:#?}", curr_game_state);
                     
                 });
             },
@@ -180,7 +179,7 @@ fn main() {
                 window.draw_2d(&event, |c, g, device| {
                     clear([0.91, 0.30, 0.24, 0.5], g); // Gray background for the start screen
     
-                    let transform = c.transform.trans(400.0, 240.0); // Position for the text
+                    let transform = c.transform.trans(500.0, 240.0); // Position for the text
                     text::Text::new_color([1.0, 1.0, 1.0, 1.0], 32)
                         .draw(
                             "Game over. Press enter to restart",
