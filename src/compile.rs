@@ -15,15 +15,6 @@ use std::collections::HashSet;
 use dynasmrt::{dynasm, DynasmApi};
 
 
-// static JUMP_LABEL: LazyLock<Mutex<i32>> = LazyLock::new(|| 0.into());
-
-// fn bool_to_num(b: &bool) -> i32 {
-//     match b {
-//         true => 1 as i32,
-//         false => 0 as i32
-//     }
-// }
-
 pub fn compile_to_instrs(e: &Expr, stack_bindings: im::HashMap<String, i32>, 
     mut variable_types: &mut HashMap<String, Type>, stack_counter: i32, 
     defined_vars: &HashMap<String, i32>) -> Vec<Instr> {
@@ -48,23 +39,9 @@ pub fn compile_to_instrs(e: &Expr, stack_bindings: im::HashMap<String, i32>,
             match op {
                 Op1::Add1 => {
                     v.push(Instr::IAdd(Val::Reg(Reg::RAX), Val::Imm(1)));
-                    // let mut current_jump = JUMP_LABEL.lock().unwrap();
-                    // v.push(Instr::Jno("unopAdd1Success".to_string(), *current_jump));
-                    // v.push(Instr::IMov(Val::Reg(Reg::RDI), Val::Imm(1)));
-                    // v.push(Instr::CallSnekErr());
-                    // v.push(Instr::Label("unopAdd1Success".to_string(), *current_jump));
-                    // *current_jump += 1;
-                    // drop(current_jump);
                 }
                 Op1::Sub1 => {
                     v.push(Instr::ISub(Val::Reg(Reg::RAX), Val::Imm(1)));
-                    // let mut current_jump = JUMP_LABEL.lock().unwrap();
-                    // v.push(Instr::Jno("unopSub1Success".to_string(), *current_jump));
-                    // v.push(Instr::IMov(Val::Reg(Reg::RDI), Val::Imm(1)));
-                    // v.push(Instr::CallSnekErr());
-                    // v.push(Instr::Label("unopSub1Success".to_string(), *current_jump));
-                    // *current_jump += 1;
-                    // drop(current_jump);
                 }
             }
             return v;
@@ -86,16 +63,7 @@ pub fn compile_to_instrs(e: &Expr, stack_bindings: im::HashMap<String, i32>,
                 Op2::Plus => v1.push(Instr::IAdd(Val::Reg(Reg::RAX), Val::Reg(Reg::RCX))), // -16
                 Op2::Minus => v1.push(Instr::ISub(Val::Reg(Reg::RAX), Val::Reg(Reg::RCX))),
                 Op2::Times => v1.push(Instr::IMul(Val::Reg(Reg::RAX), Val::Reg(Reg::RCX))),
-                // need to add more instructions for the following comparison operations
-                // cmp e1, e2 does e1 - e2
             }
-            // let mut current_jump = JUMP_LABEL.lock().unwrap();
-            // v1.push(Instr::Jno("binopSuccess".to_string(), *current_jump));
-            // v1.push(Instr::IMov(Val::Reg(Reg::RDI), Val::Imm(1)));
-            // v1.push(Instr::CallSnekErr());
-            // v1.push(Instr::Label("binopSuccess".to_string(), *current_jump));
-            // *current_jump += 1;
-            // drop(current_jump);
             return v1;
         },
         Expr::Let(vec, e) => {
@@ -172,9 +140,6 @@ fn mov_to_asm(ops: &mut dynasmrt::x64::Assembler, dest: &Val, src: &Val) {
         (Val::RegOffset(dest_reg, offset), Val::Reg(src_reg)) => {
             dynasm!(ops; .arch x64; mov [Rq(reg_to_dynasm(dest_reg)) + *offset], Rq(reg_to_dynasm(src_reg)));
         }
-        // (Val::RegOffset(dest_reg, offset), Val::Imm(n)) => {
-        //     dynasm!(ops; .arch x64; mov [Rq(reg_to_dynasm(dest_reg)) + *offset], *n);
-        // }
         _ => panic!("invalid mov"),
     }
 }
@@ -226,18 +191,9 @@ fn mul_to_asm(ops: &mut dynasmrt::x64::Assembler, dest: &Val, src: &Val) {
         (Val::Reg(dest_reg), Val::Reg(src_reg)) => {
             dynasm!(ops; .arch x64; imul Rq(reg_to_dynasm(dest_reg)), Rq(reg_to_dynasm(src_reg)));
         }
-        // (Val::Reg(dest_reg), Val::Imm(n)) => {
-        //     dynasm!(ops; .arch x64; imul Rq(reg_to_dynasm(dest_reg)), *n);
-        // }
         (Val::Reg(dest_reg), Val::RegOffset(src_reg, offset)) => {
             dynasm!(ops; .arch x64; imul Rq(reg_to_dynasm(dest_reg)), [Rq(reg_to_dynasm(src_reg)) + *offset]);
         }
-        // (Val::RegOffset(dest_reg, offset), Val::Reg(src_reg)) => {
-        //     dynasm!(ops; .arch x64; imul [Rq(reg_to_dynasm(dest_reg)) + *offset], Rq(reg_to_dynasm(src_reg)));
-        // }
-        // (Val::RegOffset(dest_reg, offset), Val::Imm(n)) => {
-        //     dynasm!(ops; .arch x64; imul [Rq(reg_to_dynasm(dest_reg)) + *offset], *n);
-        // }
         _ => panic!("invalid add"),
     }
 }
@@ -247,9 +203,6 @@ fn pop_to_asm(ops: &mut dynasmrt::x64::Assembler, val: &Val) {
         Val::Reg(r) => {
             dynasm!(ops; .arch x64; pop Rq(reg_to_dynasm(r)));
         }
-        // Val::RegOffset(r, offset) => {
-        //     dynasm!(ops; .arch x64; pop [Rq(reg_to_dynasm(src_reg)) + *offset]);
-        // }
         _ => panic!("invalid pop"),
     }
 }
@@ -258,9 +211,6 @@ fn push_to_asm(ops: &mut dynasmrt::x64::Assembler, val: &Val) {
         Val::Reg(r) => {
             dynasm!(ops; .arch x64; push Rq(reg_to_dynasm(r)));
         }
-        // Val::RegOffset(r, offset) => {
-        //     dynasm!(ops; .arch x64; push [Rq(reg_to_dynasm(src_reg)) + *offset]);
-        // }
         Val::Imm(n) => {
             dynasm!(ops; .arch x64; push *n);
         }
@@ -276,10 +226,6 @@ fn instr_to_asm(i: &Instr, ops: &mut dynasmrt::x64::Assembler) {
         Instr::IMul(dest, src) => mul_to_asm(ops, dest, src),
         Instr::Pop(val) => pop_to_asm(ops, val),
         Instr::Push(val) => push_to_asm(ops, val),
-        // Instr::Label(label_name, label_num) => {
-        //     let full_label_name = label_name.to_string() + &label_num.to_string();
-        //     dynasm!(ops; .arch x64; label:);
-        // }
         _ => {
             panic!("Instruction not supported");
         }
