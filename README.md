@@ -22,14 +22,14 @@ In the project directory, run
 - Each food item eaten corresponds to a token appended to the current program line.
     - +, -, * => binary operations
     - add1, sub1 => unary operations
-    - END => end program line
+    - ; => end program line
     - def => saves result of running current line as a heap-allocated variable accessible in future prog lines
     - let => let binding for stack-allocated bindings
     - var => beginning of var definition in let binding
     - set => set value of variable declared in let binding
     - id => when eaten, all stored variable identifiers that can be used in the prog appear as blocks
     - int & end_int => number of spaces traveled between eating both blocks is the int appended to the prog line
-    - (, ), {, }, |, ;, :=  => additional syntax
+    - (, ), {, }, |, :=  => additional syntax
 - Once a line ends, the line will be compiled and the result displayed on the right column of the game display
 - All variables (heap- and stack-allocated) are displayed on the left column of the game display
 - If the snake dies, the game is reset and all generated program lines and heap-allocated variables are lost
