@@ -48,23 +48,23 @@ pub fn compile_to_instrs(e: &Expr, stack_bindings: im::HashMap<String, i32>,
             match op {
                 Op1::Add1 => {
                     v.push(Instr::IAdd(Val::Reg(Reg::RAX), Val::Imm(1)));
-                    let mut current_jump = JUMP_LABEL.lock().unwrap();
-                    v.push(Instr::Jno("unopAdd1Success".to_string(), *current_jump));
-                    v.push(Instr::IMov(Val::Reg(Reg::RDI), Val::Imm(1)));
-                    v.push(Instr::CallSnekErr());
-                    v.push(Instr::Label("unopAdd1Success".to_string(), *current_jump));
-                    *current_jump += 1;
-                    drop(current_jump);
+                    // let mut current_jump = JUMP_LABEL.lock().unwrap();
+                    // v.push(Instr::Jno("unopAdd1Success".to_string(), *current_jump));
+                    // v.push(Instr::IMov(Val::Reg(Reg::RDI), Val::Imm(1)));
+                    // v.push(Instr::CallSnekErr());
+                    // v.push(Instr::Label("unopAdd1Success".to_string(), *current_jump));
+                    // *current_jump += 1;
+                    // drop(current_jump);
                 }
                 Op1::Sub1 => {
                     v.push(Instr::ISub(Val::Reg(Reg::RAX), Val::Imm(1)));
-                    let mut current_jump = JUMP_LABEL.lock().unwrap();
-                    v.push(Instr::Jno("unopSub1Success".to_string(), *current_jump));
-                    v.push(Instr::IMov(Val::Reg(Reg::RDI), Val::Imm(1)));
-                    v.push(Instr::CallSnekErr());
-                    v.push(Instr::Label("unopSub1Success".to_string(), *current_jump));
-                    *current_jump += 1;
-                    drop(current_jump);
+                    // let mut current_jump = JUMP_LABEL.lock().unwrap();
+                    // v.push(Instr::Jno("unopSub1Success".to_string(), *current_jump));
+                    // v.push(Instr::IMov(Val::Reg(Reg::RDI), Val::Imm(1)));
+                    // v.push(Instr::CallSnekErr());
+                    // v.push(Instr::Label("unopSub1Success".to_string(), *current_jump));
+                    // *current_jump += 1;
+                    // drop(current_jump);
                 }
             }
             return v;

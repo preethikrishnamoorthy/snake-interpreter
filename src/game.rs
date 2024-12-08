@@ -1,4 +1,5 @@
 use im::HashMap;
+use lalrpop_util::ParseError;
 // use modular_index::next;
 use piston_window::types::Color;
 use piston_window::*;
@@ -70,8 +71,6 @@ pub struct Game {
     program: Vec<Program>,
     def_bindings: Vec<i32>,
     temp_bindings: Vec<i32>,
-    brace_count: i32,
-    paren_count: i32,
     paren_list: Vec<Bracket>, //stack to keep track of parens and brackets
     is_var_binding: bool,
     id_just_eaten: bool,
@@ -79,6 +78,7 @@ pub struct Game {
     prog_print_y: i32,
     reached_goal: bool,
     goal: i32,
+    in_let_defn: bool,
 
 }
 
@@ -91,7 +91,7 @@ impl Game {
             //                 Food {food_x: 7, food_y: 3, instr: "-".to_string()},
             //                 Food {food_x: 2, food_y: 8, instr: "*".to_string()},
             //                 Food {food_x: 8, food_y: 5, instr: "def".to_string()},
-            //                 Food {food_x: 6, food_y: 6, instr: ";".to_string()},
+            //                 Food {food_x: 6, food_y: 6, instr: "END".to_string()},
             // ],
             food_list: vec![],
             window_start_x: start_x,
@@ -103,8 +103,6 @@ impl Game {
             program: vec![],
             def_bindings: vec![],
             temp_bindings: vec![],
-            brace_count: 0,
-            paren_count: 0,
             paren_list: vec![Bracket::Paren],
             is_var_binding: false,
             id_just_eaten: false,
@@ -201,7 +199,7 @@ impl Game {
             "+" => return [0.0, 1.0, 1.0, 1.0], // yellow
             "-" => return [1.0, 0.5, 0.0, 1.0], // orange
             "*" => return [1.0, 0.0, 0.0, 1.0], // red
-            ";" => return [0.0, 1.0, 0.0, 1.0], // yellow green
+            "END" => return [0.0, 1.0, 0.0, 1.0], // yellow green
             "def" => return [0.0, 1.0, 0.5, 1.0], // bluer green
             "add1" => return [0.0, 1.0, 1.0, 1.0], // cyan
             "sub1" => return [0.0, 0.5, 1.0, 1.0], // blue
@@ -246,9 +244,6 @@ impl Game {
 
             return final_state;
         }
-        
-
-        
     }
 
     fn check_eating(&mut self) {
@@ -267,15 +262,11 @@ impl Game {
             self.snake.reset_blocks_traveled();
 
             match instr_eaten.as_str() {
-                ";" => {
-                    // add number of blocks moved by snake to program
-                    // self.prog_line.push_str(&next_num_instr);
-                    // close any unclosed {
-                    // for _ in 0..self.brace_count {
-                    //     self.prog_line.push_str("}");
-                    // }
-                    // close paren in program
-                    // self.prog_line.push_str(&" )".to_string());
+                "int" => {},
+                "end_int" => {
+                    self.prog_line.push_str(&next_num_instr);
+                },
+                "END" => {
                     println!("{}", self.prog_line);
                     
                     if self.is_def_line {
@@ -283,7 +274,6 @@ impl Game {
                     }
 
                     let res = self.run_line();
-
                     println!("res of running prev line: {}", res);
 
                     if res == self.goal {
@@ -314,38 +304,27 @@ impl Game {
                     self.is_def_line = false;
                     self.id_just_eaten = false;
                     self.paren_list = vec![Bracket::Paren];
-                    self.brace_count = 0;
                 },
                 "def" => self.is_def_line = true,
                 "var" => self.is_var_binding = true,
                 "let" => {
                     self.id_just_eaten = false;
-                    self.prog_line.push_str(&" ".to_string());
-                    self.prog_line.push_str(&instr_eaten.clone());
-                    self.prog_line.push_str(&" { ".to_string());
-                    self.brace_count += 1;
+                    self.prog_line.push_str(&" let { ".to_string());
                     self.paren_list.push(Bracket::Brace);
                 }
                 "{" => {
-                    // self.brace_count += 1;
                     self.prog_line.push_str(&" { ".to_string());
                     self.paren_list.push(Bracket::Brace);
                 },
                 // assuming that the let finished so temp bindings go out of scope
                 "}" => {
                     self.id_just_eaten = false;
-                    // self.brace_count -= 1;
                     // self.temp_bindings.clear();
                     self.prog_line.push_str(&" } ".to_string());
                     let closed_bracket = self.paren_list.pop();
                     println!("ate brace, closed: {:#?}", closed_bracket);
                 },
                 ")" => {
-                    // self.paren_count -= 1;
-                    if !self.id_just_eaten {
-                        self.prog_line.push_str(&next_num_instr);
-                        self.id_just_eaten = false;
-                    }
                     self.prog_line.push_str(&" ".to_string());
                     self.prog_line.push_str(&instr_eaten.clone());
                     self.prog_line.push_str(&" ".to_string());
@@ -355,10 +334,6 @@ impl Game {
                 },
                 "+"| "-" | "*" => {
                     // if an existing var was eaten before this instr, don't add number of blocks moved to program
-                    if ! self.id_just_eaten {
-                        self.prog_line.push_str(&next_num_instr);
-                        self.id_just_eaten = false;
-                    }
                     self.prog_line.push_str(&" ".to_string());
                     self.prog_line.push_str(&instr_eaten.clone());
                     self.prog_line.push_str(&" ".to_string());
@@ -400,7 +375,6 @@ impl Game {
                     }
                     else {
                         println!("ate instr: {}", &instr_eaten.clone());
-                        // self.prog_line.push_str(&next_num_instr);
                         self.prog_line.push_str(&" ".to_string());
                         self.prog_line.push_str(&instr_eaten.clone());
                         self.prog_line.push_str(&" ".to_string());
@@ -411,6 +385,54 @@ impl Game {
             self.update_food(instr_eaten.clone());
             self.snake.restore_last_removed();
         }
+    }
+
+    fn generate_next_tokens(&mut self, last_instr: String) -> Vec<String> {
+
+        if last_instr == "int" {
+            return vec!["end_int".to_string()];
+        }
+
+        
+
+
+        let lexer = Lexer::new(&self.prog_line);
+        let parser = ExpressionParser::new();
+        let ast = parser.parse(lexer);
+        let mut tokens = vec![];
+        match ast {
+            Err(error_message) => {
+                match error_message {
+                    ParseError::InvalidToken { location} => {
+                        println!("invalid token: {} | {}", location, self.prog_line);
+                    },
+                    ParseError::UnrecognizedEof { location, expected } => {
+                        println!("unrecognized EOF: {} | {}", location, self.prog_line);
+                        tokens = expected
+                    },
+                    ParseError::UnrecognizedToken { token, expected } => {
+                        println!("unrecognized token: {:#?} | {}", token, self.prog_line);
+                        tokens = expected
+                    },
+                    ParseError::ExtraToken { token} => {
+                        println!("extra token: {:#?} | {}", token, self.prog_line);
+                    },
+                    ParseError::User { error} => panic!("user error: {} | {}", error, self.prog_line),
+                }
+            }
+            Ok(_expression) => {
+                return vec!["END".to_string()];
+            }
+        };
+        let mut processed_tokens = vec![];
+        for token in &tokens {
+            processed_tokens.push(str::replace(&token, "\"", ""));
+        }
+        if last_instr == "end_int" {
+            processed_tokens.append(&mut vec!["+".to_string(), "-".to_string(), "*".to_string()]);
+        }
+        println!("{:#?}", processed_tokens);
+        return processed_tokens;
     }
 
     fn check_if_the_snake_alive(&self, dir: Option<Direction>) -> bool {
@@ -427,7 +449,8 @@ impl Game {
 
     fn update_food(&mut self, last_instr: String) {
         let mut rng = thread_rng();
-        let next_instrs = self.generate_instructions(last_instr);
+        // let next_instrs = self.generate_instructions(last_instr);
+        let next_instrs = self.generate_next_tokens(last_instr);
 
         self.food_list = vec![];
         for instr in next_instrs {
@@ -464,7 +487,7 @@ impl Game {
                 next_instrs.push(")".to_string());
             }
         } else { //if all parens are closed, prog can be compiled
-            next_instrs.push(";".to_string());
+            next_instrs.push("END".to_string());
             return next_instrs;
         }
 
@@ -506,7 +529,7 @@ impl Game {
                 next_instrs.append(&mut var_names);
             },
             ")" => next_instrs.append(&mut vec!["+".to_string(), "-".to_string(), "*".to_string()]),
-            ";" => {
+            "END" => {
                 next_instrs.append(&mut vec!["var".to_string(), "let".to_string(), "(".to_string()]);
                 next_instrs.append(&mut int_follow_set);
                 if self.temp_bindings.len() > 0 || self.def_bindings.len() > 0 {
@@ -569,7 +592,7 @@ impl Game {
         // // remove ) from next instr if parens are balanced
         // if self.paren_count == 0 {
         //     next_instrs.retain(|x| x != ")");
-        //     next_instrs.push(";".to_string());
+        //     next_instrs.push("END".to_string());
         // }
         
         

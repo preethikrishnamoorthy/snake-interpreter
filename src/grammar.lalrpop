@@ -53,10 +53,11 @@ pub TypeMatching: utils::Type = {
 
 pub ExpressionBody: utils::Expr = {
   "let" "{" <bindings:VarBinding*> "}" "{" <expr:Expression> "}" =>? {
-      if bindings.len() == 0 {Err(ParseError::User { 
-          error: LexicalError::InvalidLength("empty binding in let".to_string())
-        })}
-      else {Ok(utils::Expr::Let (bindings, Box::new(expr)))}
+      // if bindings.len() == 0 {Err(ParseError::User { 
+      //     error: LexicalError::InvalidLength("empty binding in let".to_string())
+      //   })}
+      // else {Ok(utils::Expr::Let (bindings, Box::new(expr)))}
+      {Ok(utils::Expr::Let (bindings, Box::new(expr)))}
     },
   "set" <name:"identifier"> ":=" <value:Expression> ";" =>? {
     if name == "input" {Err(ParseError::User { 
