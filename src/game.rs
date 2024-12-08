@@ -1,5 +1,6 @@
 use im::{HashMap, HashSet};
 use lalrpop_util::ParseError;
+// use modular_index::next;
 use piston_window::types::Color;
 use piston_window::*;
 
@@ -75,6 +76,8 @@ pub struct Game {
     prog_print_y: i32,
 
     last_instr: String,
+
+    count_blocks: bool,
 }
 
 impl Game {
@@ -98,6 +101,7 @@ impl Game {
             num_let_bindings: 0,
             in_set: false,
             last_instr: "".to_string(),
+            count_blocks: false
 
         };
         // make food list anything that could follow (
@@ -241,12 +245,15 @@ impl Game {
         self.snake.reset_blocks_traveled();
 
         match instr_eaten.as_str() {
-            "int" => {}, //start of int blocks traveled
+            "int" => {
+                self.count_blocks = true;
+            }, //start of int blocks traveled
             "id" => {}, //start of display of id blocks
             "end_int" => { //end of int blocks traveled
+                self.count_blocks = false;
                 self.prog_line.push_str(&next_num_instr);
             },
-            "END" => {
+            ";" => {
                 println!("{}", self.prog_line);
                 if self.is_def_line {
                     println!("saving result to var number {}", self.def_bindings.len());
@@ -278,7 +285,7 @@ impl Game {
 
                 self.is_def_line = false;
                 self.num_let_bindings = 0;
-                self.snake = Snake::new(self.snake.head_position().0, self.snake.head_position().0); 
+                // self.snake = Snake::new(self.snake.head_position().0, self.snake.head_position().0); 
             },
             "def" => self.is_def_line = true,
             "var" => {
@@ -322,10 +329,10 @@ impl Game {
                 self.prog_line.push_str(&" set ".to_string());
                 self.in_set = true;
             },
-            ";" => {
-                println!("ate instr: {}", &instr_eaten.clone());
-                self.prog_line.push_str(&" ; ".to_string());
-            }
+            // ";" => {
+            //     println!("ate instr: {}", &instr_eaten.clone());
+            //     self.prog_line.push_str(&" ; ".to_string());
+            // }
             "|" => {
                 println!("ate instr: {}", &instr_eaten.clone());
                 self.prog_line.push_str(&" | ".to_string());
@@ -408,7 +415,7 @@ impl Game {
             return tokens;
         }
 
-        if last_instr == "" || last_instr == "END" {  //first instr of line can be def, no other instr
+        if last_instr == "" || last_instr == ";" {  //first instr of line can be def, no other instr
             tokens.insert("def".to_string());
         }
 
@@ -437,7 +444,7 @@ impl Game {
                 }
             }
             Ok(_expression) => {
-                tokens.insert("END".to_string());
+                tokens.insert(";".to_string());
                 return tokens;
             }
         };
@@ -487,19 +494,48 @@ impl Game {
         // let next_instrs = self.generate_instructions(last_instr);
         let next_instrs = self.generate_next_tokens(last_instr);
 
-        self.food_list = vec![];
-        for instr in next_instrs {
+        let mut token_positions: HashSet<(i32, i32)> = HashSet::new();
+
+        // generate a new token for every instr
+        // generate 5 end_int tokens if one token is end_int
+        let mut num_new_tokens = next_instrs.len();
+        if next_instrs.contains("end_int") {
+            num_new_tokens += 4;
+        }
+
+        while token_positions.len() < num_new_tokens {
             let mut new_x = rng.gen_range((self.window_start_x + 1)..(self.width - 1));
             let mut new_y = rng.gen_range(1..(self.height - 1));
             while self.snake.is_overlap_except_tail(new_x, new_y) {
                 new_x = rng.gen_range((self.window_start_x + 1)..(self.width - 1));
                 new_y = rng.gen_range(1..(self.height - 1));
             }
+            token_positions.insert((new_x, new_y));
+        }
 
+        // add all non end_int food tokens
+        self.food_list = vec![];
+        for instr in next_instrs {
+            if instr != "end_int" {
+                let position = token_positions.iter().next().unwrap().clone();
+                token_positions.remove(&position);
+                let new_food = Food {
+                    food_x: position.0,
+                    food_y: position.1,
+                    instr: instr.to_string(),
+                };
+                self.food_list.push(new_food);
+            }
+        }
+        // add all end_int food tokens with remaining positions
+        // if there were no end_int tokens, this block is skipped
+        while token_positions.len() > 0 {
+            let position = token_positions.iter().next().unwrap().clone();
+            token_positions.remove(&position);
             let new_food = Food {
-                food_x: new_x,
-                food_y: new_y,
-                instr: instr.to_string(),
+                food_x: position.0,
+                food_y: position.1,
+                instr: "end_int".to_string(),
             };
             self.food_list.push(new_food);
         }
@@ -507,7 +543,7 @@ impl Game {
 
     fn update_snake(&mut self, dir: Option<Direction>) {
         if self.check_if_the_snake_alive(dir) {
-            self.snake.move_forward(dir);
+            self.snake.move_forward(dir, self.count_blocks);
             self.check_eating();
         } else {
             self.is_game_over = true;

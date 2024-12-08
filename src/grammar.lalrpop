@@ -60,7 +60,7 @@ pub ExpressionBody: utils::Expr = {
       // else {Ok(utils::Expr::Let (bindings, Box::new(expr)))}
       Ok(utils::Expr::Let (bindings, Box::new(expr)))
     },
-  "set" <name:"identifier"> ":=" <value:Expression> ";" =>? {
+  "set" <name:"identifier"> ":=" <value:Expression> =>? {
     if name == "input" {Err(ParseError::User { 
         error: LexicalError::InvalidSet
       })}

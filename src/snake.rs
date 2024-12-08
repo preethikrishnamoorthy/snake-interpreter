@@ -70,7 +70,7 @@ impl Snake {
         }
     }
 
-    pub fn move_forward(&mut self, dir: Option<Direction>) {
+    pub fn move_forward(&mut self, dir: Option<Direction>, update_blocks: bool) {
         // Change moving direction
         match dir {
             Some(d) => self.moving_direction = d,
@@ -102,7 +102,9 @@ impl Snake {
         self.body.push_front(new_block);
         let removed_blk = self.body.pop_back().unwrap();
         self.last_removed_block = Some(removed_blk);
-        self.blocks_traveled += 1;
+        if update_blocks {
+            self.blocks_traveled += 1;
+        }
     }
 
     pub fn head_position(&self) -> (i32, i32) {
