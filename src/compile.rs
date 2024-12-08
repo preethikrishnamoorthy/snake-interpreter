@@ -10,12 +10,12 @@ use utils::Type;
 use utils::Expr;
 use utils::typecheck;
 
-use std::sync::{LazyLock, Mutex};
+// use std::sync::{LazyLock, Mutex};
 use std::collections::HashSet;
 use dynasmrt::{dynasm, DynasmApi};
 
 
-static JUMP_LABEL: LazyLock<Mutex<i32>> = LazyLock::new(|| 0.into());
+// static JUMP_LABEL: LazyLock<Mutex<i32>> = LazyLock::new(|| 0.into());
 
 // fn bool_to_num(b: &bool) -> i32 {
 //     match b {

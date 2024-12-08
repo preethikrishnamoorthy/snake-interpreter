@@ -80,6 +80,8 @@ pub enum Token {
     RParen,
     #[token(";")]
     Semicolon,
+    #[token("|")]
+    Pipe,
     #[token(":=")]
     Assign,
     #[token("[")]
