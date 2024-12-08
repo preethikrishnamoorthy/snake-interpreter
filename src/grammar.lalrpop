@@ -91,7 +91,7 @@ pub Addend: utils::Expr = {
 
 pub Factor: utils::Expr = {
   Summand,
-  "(" <op:UnOp> <rhs:Summand> ")" => utils::Expr::UnOp (op, Box::new(rhs))
+  <op:UnOp> <rhs:Summand> => utils::Expr::UnOp (op, Box::new(rhs))
 }
 
 pub Summand: utils::Expr = {
