@@ -1,8 +1,11 @@
 use im::{HashMap, HashSet};
 use lalrpop_util::ParseError;
-// use modular_index::next;
 use piston_window::types::Color;
 use piston_window::*;
+
+use super::utils::Instr;
+use super::utils::Reg;
+use super::utils::Val;
 
 use crate::utils::Type;
 
@@ -574,8 +577,12 @@ impl Game {
                     var_name.push_str(&idx.to_string());
                     compilation_bindings.insert(var_name, value);
                 }
-                let instrs = compile_to_instrs(&expression, stack_bindings, &mut variable_types,
-                    0, &compilation_bindings);
+                let mut instrs = vec![];
+                instrs.push(Instr::Push(Val::Reg(Reg::RBP)));
+                instrs.push(Instr::IMov(Val::Reg(Reg::RBP), Val::Reg(Reg::RSP)));
+                instrs.append(&mut compile_to_instrs(&expression, stack_bindings, &mut variable_types,
+                    8, &compilation_bindings));
+                instrs.push(Instr::Pop(Val::Reg(Reg::RBP)));
                 println!("{:?}", instrs);
                 instrs_to_asm(&instrs, &mut ops);
                 dynasm!(ops
