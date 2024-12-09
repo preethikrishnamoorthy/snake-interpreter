@@ -31,19 +31,12 @@ fn main() {
     let goal = rand::thread_rng().gen_range(0..100);
     let mut game = Game::new(snake_window_start_x, (width - snake_window_start_x) / 2, height, goal);
     let mut curr_game_state = GameState::StartScreen;
-    // let mut game_state = 
-    // let mut game_started = false;
-    // let mut snake_died = false;
-    // let mut reached_goal = false;
     let mut font = window.load_font("src/Poppins-Bold.ttf").unwrap(); // Load a font
 
     
 
     // Event loop
     while let Some(event) = window.next() {
-
-        // println!("game_state: {:#?}", curr_game_state);
-
         match curr_game_state {
             GameState::StartScreen => {
                 if let Some(Button::Keyboard(Key::S)) = event.press_args() {
@@ -170,14 +163,31 @@ fn main() {
                 });
             },
             GameState::ReachedGoal => {
-                return;
+                if let Some(Button::Keyboard(Key::Return)) = event.press_args() {
+                    curr_game_state = GameState::GameStarted;
+                }
+                window.draw_2d(&event, |c, g, device| {
+                    clear([0.102, 0.58, 0.063, 1.0], g); // green background for you won :)
+    
+                    let transform = c.transform.trans(320.0, 240.0); // Position for the text
+                    text::Text::new_color([1.0, 1.0, 1.0, 1.0], 32)
+                        .draw(
+                            "Congrats! You won! You ARE the king cobra. yay! Press enter to restart.",
+                            &mut font,
+                            &DrawState::default(),
+                            transform,
+                            g,
+                        )
+                        .unwrap();
+                    font.factory.encoder.flush(device);
+                });
             },
             GameState::SnakeDied => {
                 if let Some(Button::Keyboard(Key::Return)) = event.press_args() {
                     curr_game_state = GameState::GameStarted;
                 }
                 window.draw_2d(&event, |c, g, device| {
-                    clear([0.91, 0.30, 0.24, 0.5], g); // Gray background for the start screen
+                    clear([0.91, 0.30, 0.24, 0.5], g); // red background for you died :(
     
                     let transform = c.transform.trans(700.0, 240.0); // Position for the text
                     text::Text::new_color([1.0, 1.0, 1.0, 1.0], 32)
