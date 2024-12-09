@@ -74,6 +74,7 @@ pub struct Game {
     def_bindings: Vec<i32>,
     num_let_bindings: i32,
     in_set: bool,
+    in_let_binding: bool,
 
     prog_print_x: i32,
     prog_print_y: i32,
@@ -104,7 +105,8 @@ impl Game {
             num_let_bindings: 0,
             in_set: false,
             last_instr: "".to_string(),
-            count_blocks: false
+            count_blocks: false,
+            in_let_binding: false,
 
         };
         // make food list anything that could follow (
@@ -299,6 +301,7 @@ impl Game {
             },
             "let" => {
                 self.prog_line.push_str(&" let { ".to_string());
+                self.in_let_binding = true;
             }
             "{" => {
                 self.prog_line.push_str(&" { ".to_string());
@@ -306,6 +309,7 @@ impl Game {
             // assuming that the let finished so temp bindings go out of scope
             "}" => {
                 self.prog_line.push_str(&" } ".to_string());
+                self.in_let_binding = false;
             },
             ")" => {
                 self.prog_line.push_str(&" ".to_string());
@@ -332,10 +336,6 @@ impl Game {
                 self.prog_line.push_str(&" set ".to_string());
                 self.in_set = true;
             },
-            // ";" => {
-            //     println!("ate instr: {}", &instr_eaten.clone());
-            //     self.prog_line.push_str(&" ; ".to_string());
-            // }
             "|" => {
                 println!("ate instr: {}", &instr_eaten.clone());
                 self.prog_line.push_str(&" | ".to_string());
@@ -473,6 +473,10 @@ impl Game {
         }
         if self.num_let_bindings == 0 {
             processed_tokens.retain(|x| x != "set");
+        }
+
+        if self.in_let_binding {
+            processed_tokens.retain(|x| x != "let");
         }
 
         println!("{:?}", processed_tokens);

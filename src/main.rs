@@ -13,7 +13,7 @@ const BACK_COLOR: Color = [0.204, 0.286, 0.369, 1.0];
 
 
 fn main() {
-    let (width, height) = (50, 20);
+    let (width, height) = (70, 20);
     let snake_window_start_x = 10;
     let game_window_width = (to_gui_coord_u32(width - snake_window_start_x) as f64) / 2.0;
 
@@ -52,7 +52,7 @@ fn main() {
                 window.draw_2d(&event, |c, g, device| {
                     clear(BACK_COLOR, g); // Gray background for the start screen
     
-                    let transform = c.transform.trans(500.0, 240.0); // Position for the text
+                    let transform = c.transform.trans(750.0, 240.0); // Position for the text
                     text::Text::new_color([1.0, 1.0, 1.0, 1.0], 32)
                         .draw(
                             "Press 'S' to Start",
@@ -179,7 +179,7 @@ fn main() {
                 window.draw_2d(&event, |c, g, device| {
                     clear([0.91, 0.30, 0.24, 0.5], g); // Gray background for the start screen
     
-                    let transform = c.transform.trans(500.0, 240.0); // Position for the text
+                    let transform = c.transform.trans(700.0, 240.0); // Position for the text
                     text::Text::new_color([1.0, 1.0, 1.0, 1.0], 32)
                         .draw(
                             "Game over. Press enter to restart",
