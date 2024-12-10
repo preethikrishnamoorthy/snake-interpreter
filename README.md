@@ -35,7 +35,7 @@ In the project directory, run
 - If the snake dies, the game is reset and all generated program lines and heap-allocated variables are lost
 
 ## Modified snek grammar
-- expr_body -> let { var_binding* } { expr } | set identifier := expr ;
+- expr_body -> let { var_binding* } { expr } | set identifier := expr
 - var_binding -> var identifier := expr |
 - expr -> term | expr_body
 - term -> addend | term add_op addend
@@ -49,4 +49,4 @@ In the project directory, run
 ## Credits
 Snake game starter code from [rust-snake](https://github.com/SLMT/rust-snake/tree/master)
 
-Compiler base from our submission for 17-363 [forest flame](https://github.com/sherylm77/forest-flame?tab=readme-ov-file)
+Compiler and parser base from our submission for 17-363 [forest flame](https://github.com/sherylm77/forest-flame?tab=readme-ov-file)

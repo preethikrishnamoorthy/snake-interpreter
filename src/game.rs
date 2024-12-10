@@ -461,7 +461,7 @@ impl Game {
             processed_tokens.insert(processed_line);
         }
 
-        if last_instr == "end_int" || last_instr.starts_with("x") || last_instr.starts_with("y") {
+        if (last_instr == "end_int" || last_instr.starts_with("x") || last_instr.starts_with("y")) && !self.in_set {
             processed_tokens.insert("+".to_string());
             processed_tokens.insert("-".to_string());
             processed_tokens.insert("*".to_string());
